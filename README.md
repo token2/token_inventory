@@ -51,13 +51,16 @@ This is a simple, lightweight web application built in PHP to manage hardware OA
 
 ## Screenshots
 **Login Page**  
-[Insert Screenshot Here]
+![image](https://github.com/user-attachments/assets/30217393-4866-4c4b-913b-dab73707596c)
+
 
 **Token List**  
-[Insert Screenshot Here]
+![image](https://github.com/user-attachments/assets/f47964c6-eb82-42cc-b480-b3070d4c078b)
+
 
 **Import Modal**  
-[Insert Screenshot Here]
+![image](https://github.com/user-attachments/assets/1cdddb63-9644-4f04-b4d8-66ca4fe20580)
+
 
 ---
 
