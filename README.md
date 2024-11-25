@@ -19,29 +19,6 @@ This is a simple, lightweight web application built in PHP to manage hardware OA
 - **Interactive Table**:
   - Integrated with [DataTables](https://datatables.net/) for sorting, searching, and pagination.
 
----
-
-## Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/hardware-token-management.git
-   cd hardware-token-management
-   ```
-
-2. Update the configuration in `index.php`:
-   - Replace the following placeholders with your own values:
-	$tenantId = 'YOUR_TENANT_ID';
-	$clientId = 'YOUR_CLIENT_ID';
-	$clientSecret = 'YOUR_CLIENT_SECRET';
-
-	$valid_username = 'username to access this app'; // Set your username
-	$valid_password = 'password to access the app'; // Set your password
-
-
-
-3. Deploy the application on a PHP-compatible server (e.g., Apache, Nginx).
-
-4. Access the application in your browser.
 
 ---
 
