@@ -28,7 +28,7 @@ This is a simple, lightweight web application built in PHP to manage hardware OA
    - Update these credentials in `index.php`.
 
 2. **Import Tokens**:
-   - Use the **Import Tokens** button to upload a JSON file with the token details. This format is available in Token2's seed request form.
+   - Use the **Import Tokens** button to upload a JSON file with the token details. This format is available in Token2's seed request form. More information is available here: https://www.token2.swiss/site/page/classic-hardware-tokens-for-entra-id-mfa-graph-api-method-with-self-service-and-sha-256-tokens-support 
    - Example JSON format:
      ```json
      [
