@@ -4,8 +4,9 @@
 ## Overview
 
 This is a simple, lightweight web application built in PHP to manage hardware OATH tokens using the Microsoft Graph API. It includes features such as listing tokens, importing token configurations via JSON files, and providing an intuitive and responsive interface with Bootstrap.
-This repository serves as an excellent example of leveraging the Microsoft Graph API programmatically, going beyond the basic capabilities of the Graph API Explorer. By integrating direct API calls into a functional PHP application, it demonstrates how developers can interact with Microsoft Graph to manage hardware OATH tokens in real-world scenarios. The application showcases practical use cases such as fetching token details, importing configurations via JSON, and providing an intuitive UI for users—all while illustrating how to securely authenticate and work with the Graph API in a production-ready environment. 
+
 ---
+This repository serves as an excellent example of leveraging the Microsoft Graph API programmatically, going beyond the basic capabilities of the Graph API Explorer. By integrating direct API calls into a functional PHP application, it demonstrates how developers can interact with Microsoft Graph to manage hardware OATH tokens in real-world scenarios. The application showcases practical use cases such as fetching token details, importing configurations via JSON, and providing an intuitive UI for users—all while illustrating how to securely authenticate and work with the Graph API in a production-ready environment. 
 
 ## Features
 - **Authentication**:
