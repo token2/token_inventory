@@ -49,6 +49,7 @@ Add the following **Application permissions**:
 | `Directory.Read.All` | Read directory data | Required to access authentication method devices |
 | `User.Read.All` | Read all users' full profiles | Needed to list and search users for token assignment |
 | `User.ReadWrite.All` | Read and write all users' full profiles | Required for assigning and activating tokens |
+| `User.ReadBasic.All` | Read all users' full profiles | Required for listing users |
 
 #### Authentication Method Permissions (if available)
 | Permission | Purpose | Justification |
