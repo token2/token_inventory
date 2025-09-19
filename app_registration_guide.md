@@ -54,7 +54,7 @@ Add the following **Application permissions**:
 | Permission | Purpose | Justification |
 |------------|---------|---------------|
 | `AuthenticationMethod.Read.All` | Read authentication methods | View existing authentication methods |
-| `AuthenticationMethod.ReadWrite.All` | Manage authentication methods | Full management of OATH tokens |
+| `Policy.ReadWrite.AuthenticationMethodl` | Manage authentication methods | Full management of OATH tokens |
 
 ### 2.3 Add Each Permission
 For each permission listed above:
