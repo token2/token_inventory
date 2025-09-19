@@ -5,13 +5,17 @@ $tenantId = 'xxx';
 $clientId = 'xxx';
 $clientSecret = 'xx';
 
+
 $valid_username = 'admin'; // Set your username
 $valid_password = 'P@ssword1'; // Set your password
+ 
+ 
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
  
+
 session_start();
-
- 
 
 // Handle logout
 if (isset($_GET['logout'])) {
@@ -133,7 +137,69 @@ function importTokens($accessToken, $importData) {
     return json_decode($response, true);
 }
 
-// NEW FUNCTION: Activate a token for a specific user
+// NEW FUNCTION: Simple user fetch with detailed debugging
+function getUsers($accessToken) {
+    // Start with the exact same query that works in Graph Explorer
+    $url = "https://graph.microsoft.com/v1.0/users?\$top=5";
+    
+    $headers = [
+        "Authorization: Bearer $accessToken",
+        "Content-Type: application/json",
+        "User-Agent: Token2-PHP-Client/1.0"
+    ];
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    $info = curl_getinfo($ch);
+    curl_close($ch);
+
+    // Detailed logging
+    error_log("=== USER API DEBUG ===");
+    error_log("URL: $url");
+    error_log("HTTP Code: $httpCode");
+    error_log("CURL Error: $error");
+    error_log("Response Length: " . strlen($response));
+    error_log("Response (first 500 chars): " . substr($response, 0, 500));
+    error_log("=== END DEBUG ===");
+
+    if ($error) {
+        error_log("CURL Error getting users: $error");
+        return ['error' => "Connection error: $error"];
+    }
+    
+    if ($httpCode !== 200) {
+        error_log("HTTP Error getting users: $httpCode - Response: $response");
+        return ['error' => "HTTP $httpCode: " . substr($response, 0, 200)];
+    }
+
+    $responseData = json_decode($response, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log("JSON decode error: " . json_last_error_msg());
+        return ['error' => "JSON decode error: " . json_last_error_msg()];
+    }
+    
+    if (!isset($responseData['value'])) {
+        error_log("No 'value' key in response: " . print_r($responseData, true));
+        return ['error' => "Invalid response format"];
+    }
+
+    $users = $responseData['value'];
+    error_log("Successfully fetched " . count($users) . " users");
+    
+    return $users;
+}
+
+// NEW FUNCTION: Activate token
 function activateToken($accessToken, $userId, $tokenId, $verificationCode) {
     $url = "https://graph.microsoft.com/beta/users/$userId/authentication/hardwareOathMethods/$tokenId/activate";
     $headers = [
@@ -141,9 +207,7 @@ function activateToken($accessToken, $userId, $tokenId, $verificationCode) {
         "Content-Type: application/json",
     ];
     
-    $data = [
-        "verificationCode" => $verificationCode
-    ];
+    $data = ["verificationCode" => $verificationCode];
 
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -155,16 +219,10 @@ function activateToken($accessToken, $userId, $tokenId, $verificationCode) {
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    $responseData = json_decode($response, true);
-    
-    return [
-        'success' => $httpCode === 204 || $httpCode === 200,
-        'httpCode' => $httpCode,
-        'response' => $responseData
-    ];
+    return ($httpCode === 204 || $httpCode === 200);
 }
 
-// NEW FUNCTION: Assign a token to a user
+// NEW FUNCTION: Assign token
 function assignToken($accessToken, $userId, $tokenId) {
     $url = "https://graph.microsoft.com/beta/users/$userId/authentication/hardwareOathMethods";
     $headers = [
@@ -172,11 +230,7 @@ function assignToken($accessToken, $userId, $tokenId) {
         "Content-Type: application/json",
     ];
     
-    $data = [
-        "device" => [
-            "id" => $tokenId
-        ]
-    ];
+    $data = ["device" => ["id" => $tokenId]];
 
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -188,79 +242,60 @@ function assignToken($accessToken, $userId, $tokenId) {
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    return [
-        'success' => $httpCode === 201 || $httpCode === 200,
-        'httpCode' => $httpCode,
-        'response' => json_decode($response, true)
-    ];
-}
-
-// NEW FUNCTION: Get users for assignment dropdown
-function getUsers($accessToken, $search = '') {
-    $url = "https://graph.microsoft.com/v1.0/users";
-    if ($search) {
-        $url .= "?\$filter=startswith(displayName,'$search') or startswith(userPrincipalName,'$search')&\$top=20";
-    } else {
-        $url .= "?\$top=50";
-    }
-    
-    $headers = [
-        "Authorization: Bearer $accessToken",
-        "Content-Type: application/json",
-    ];
-
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    $response = curl_exec($ch);
-    curl_close($ch);
-
-    $responseData = json_decode($response, true);
-    return $responseData['value'] ?? [];
+    return ($httpCode === 201 || $httpCode === 200);
 }
 
 // Get Access Token
 $accessToken = getAccessToken($tenantId, $clientId, $clientSecret);
 if (!$accessToken) {
-    die('Failed to authenticate with Microsoft Graph.');
+    die('Failed to authenticate with Microsoft Graph. Check your credentials.');
 }
 
 // Handle AJAX requests
 if (isset($_GET['action'])) {
     header('Content-Type: application/json');
     
-    switch ($_GET['action']) {
-        case 'get_users':
-            $search = $_GET['search'] ?? '';
-            $users = getUsers($accessToken, $search);
-            echo json_encode(['users' => $users]);
-            break;
-            
-        case 'activate_token':
-            $userId = $_POST['user_id'] ?? '';
-            $tokenId = $_POST['token_id'] ?? '';
-            $verificationCode = $_POST['verification_code'] ?? '';
-            
-            if ($userId && $tokenId && $verificationCode) {
-                $result = activateToken($accessToken, $userId, $tokenId, $verificationCode);
-                echo json_encode($result);
-            } else {
-                echo json_encode(['success' => false, 'error' => 'Missing required parameters']);
-            }
-            break;
-            
-        case 'assign_token':
-            $userId = $_POST['user_id'] ?? '';
-            $tokenId = $_POST['token_id'] ?? '';
-            
-            if ($userId && $tokenId) {
-                $result = assignToken($accessToken, $userId, $tokenId);
-                echo json_encode($result);
-            } else {
-                echo json_encode(['success' => false, 'error' => 'Missing required parameters']);
-            }
-            break;
+    try {
+        switch ($_GET['action']) {
+            case 'get_users':
+                $users = getUsers($accessToken);
+                if (empty($users)) {
+                    echo json_encode(['success' => false, 'error' => 'No users found or permission error']);
+                } else {
+                    echo json_encode(['success' => true, 'users' => $users]);
+                }
+                break;
+                
+            case 'activate_token':
+                $userId = $_POST['user_id'] ?? '';
+                $tokenId = $_POST['token_id'] ?? '';
+                $verificationCode = $_POST['verification_code'] ?? '';
+                
+                if ($userId && $tokenId && $verificationCode) {
+                    $result = activateToken($accessToken, $userId, $tokenId, $verificationCode);
+                    echo json_encode(['success' => $result]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => 'Missing parameters']);
+                }
+                break;
+                
+            case 'assign_token':
+                $userId = $_POST['user_id'] ?? '';
+                $tokenId = $_POST['token_id'] ?? '';
+                
+                if ($userId && $tokenId) {
+                    $result = assignToken($accessToken, $userId, $tokenId);
+                    echo json_encode(['success' => $result]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => 'Missing parameters']);
+                }
+                break;
+                
+            default:
+                echo json_encode(['success' => false, 'error' => 'Invalid action']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
     exit;
 }
@@ -300,53 +335,36 @@ $tokens = fetchHardwareTokens($accessToken);
         .status-assigned { color: #007bff; }
         .status-activated { color: #17a2b8; }
         .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
-        .activation-timer { 
-            font-weight: bold; 
-            color: #dc3545;
-            font-size: 0.9em;
-        }
-        .user-select { 
-            width: 200px; 
-            max-width: 200px;
-        }
     </style>
 </head>
 <body>
     <div class="container mt-4">
-<div class="float-right"	
-	   
-		
-		
-		
-	<!-- Import Button -->
-        <button type="button" class="btn btn-primary mb-3   mx-1 " data-toggle="modal" data-target="#importModal">
-            import tokens
-        </button>
-		
-		<a  href=?logout class="btn btn-secondary mb-3   "  >
-            log out 
-        </a>
-		
-	</div>	
-		
-		
+        <div class="float-right">
+            <!-- Import Button -->
+            <button type="button" class="btn btn-primary mb-3 mx-1" data-toggle="modal" data-target="#importModal">
+                Import Tokens
+            </button>
+            
+            <a href="?logout" class="btn btn-secondary mb-3">
+                Log Out 
+            </a>
+        </div>
+        
         <h5>Entra ID - Hardware token inventory portal</h5>
         <?php if ($message): ?>
             <p class="message"><?= htmlspecialchars($message) ?></p>
         <?php endif; ?>
         
-       
-		<br style="clear:both">
-		
+        <br style="clear:both">
 
         <!-- Import Modal -->
-        <div class="modal fade" id="importModal" tabindex="-1" role="dialog" aria-labelledby="importModalLabel" aria-hidden="true">
+        <div class="modal fade" id="importModal" tabindex="-1" role="dialog">
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="importModalLabel">Import Tokens</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
+                        <h5 class="modal-title">Import Tokens</h5>
+                        <button type="button" class="close" data-dismiss="modal">
+                            <span>&times;</span>
                         </button>
                     </div>
                     <div class="modal-body">
@@ -362,66 +380,58 @@ $tokens = fetchHardwareTokens($accessToken);
             </div>
         </div>
 
-        <!-- Assign Token Modal -->
-        <div class="modal fade" id="assignModal" tabindex="-1" role="dialog" aria-labelledby="assignModalLabel" aria-hidden="true">
+        <!-- Assign Modal -->
+        <div class="modal fade" id="assignModal" tabindex="-1" role="dialog">
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="assignModalLabel">Assign Token</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
+                        <h5 class="modal-title">Assign Token</h5>
+                        <button type="button" class="close" data-dismiss="modal">
+                            <span>&times;</span>
                         </button>
                     </div>
                     <div class="modal-body">
                         <div class="form-group">
-                            <label for="tokenSerial">Token Serial:</label>
+                            <label>Token:</label>
                             <input type="text" id="tokenSerial" class="form-control" readonly>
                         </div>
                         <div class="form-group">
-                            <label for="userSelect">Select User:</label>
-                            <select id="userSelect" class="form-control user-select">
+                            <label>Select User:</label>
+                            <select id="userSelect" class="form-control">
                                 <option value="">Loading users...</option>
                             </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="userSearch">Or search for user:</label>
-                            <input type="text" id="userSearch" class="form-control" placeholder="Type to search users...">
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                        <button type="button" class="btn btn-primary" onclick="assignToken()">Assign Token</button>
+                        <button type="button" class="btn btn-primary" onclick="assignTokenAction()">Assign</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Activate Token Modal -->
-        <div class="modal fade" id="activateModal" tabindex="-1" role="dialog" aria-labelledby="activateModalLabel" aria-hidden="true">
+        <!-- Activate Modal -->
+        <div class="modal fade" id="activateModal" tabindex="-1" role="dialog">
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="activateModalLabel">Activate Token</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
+                        <h5 class="modal-title">Activate Token</h5>
+                        <button type="button" class="close" data-dismiss="modal">
+                            <span>&times;</span>
                         </button>
                     </div>
                     <div class="modal-body">
                         <div class="form-group">
-                            <label for="activateTokenSerial">Token Serial:</label>
+                            <label>Token:</label>
                             <input type="text" id="activateTokenSerial" class="form-control" readonly>
                         </div>
                         <div class="form-group">
-                            <label for="activateUser">Assigned User:</label>
+                            <label>User:</label>
                             <input type="text" id="activateUser" class="form-control" readonly>
                         </div>
                         <div class="form-group">
-                            <label for="verificationCode">Verification Code from Token:</label>
-                            <input type="text" id="verificationCode" class="form-control" placeholder="Enter 6-digit code" maxlength="6" pattern="[0-9]{6}">
-                            <small class="form-text text-muted">
-                                Enter the current 6-digit code displayed on the hardware token.
-                                <span id="activationTimer" class="activation-timer"></span>
-                            </small>
+                            <label>Verification Code:</label>
+                            <input type="text" id="verificationCode" class="form-control" placeholder="Enter 6-digit code" maxlength="6">
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -432,7 +442,6 @@ $tokens = fetchHardwareTokens($accessToken);
             </div>
         </div>
 
-       
         <table id="tokensTable" class="table table-striped">
             <thead class="thead-dark">
                 <tr>
@@ -451,7 +460,7 @@ $tokens = fetchHardwareTokens($accessToken);
                         <td><?= htmlspecialchars($token['manufacturer']) ?> / <?= htmlspecialchars($token['model']) ?></td>
                         <td>
                             <?php if (isset($token['assignedTo']) && $token['assignedTo']): ?>
-                                <span title="<?= htmlspecialchars($token['assignedTo']['id'] ?? '') ?>">
+                                <span data-user-id="<?= htmlspecialchars($token['assignedTo']['id'] ?? '') ?>">
                                     <?= htmlspecialchars($token['assignedTo']['displayName']) ?>
                                 </span>
                             <?php else: ?>
@@ -466,16 +475,11 @@ $tokens = fetchHardwareTokens($accessToken);
                         <td><?= htmlspecialchars($token['lastUsedDateTime'] ?? 'Never') ?></td>
                         <td>
                             <?php if ($token['status'] === 'available'): ?>
-                                <button class="btn btn-sm btn-outline-primary" 
-                                        onclick="openAssignModal('<?= htmlspecialchars($token['id']) ?>', '<?= htmlspecialchars($token['serialNumber']) ?>')">
+                                <button class="btn btn-sm btn-outline-primary" onclick="openAssignModal('<?= htmlspecialchars($token['id']) ?>', '<?= htmlspecialchars($token['serialNumber']) ?>')">
                                     Assign
                                 </button>
                             <?php elseif ($token['status'] === 'assigned'): ?>
-                                <button class="btn btn-sm btn-outline-success" 
-                                        onclick="openActivateModal('<?= htmlspecialchars($token['id']) ?>', 
-                                                                    '<?= htmlspecialchars($token['serialNumber']) ?>', 
-                                                                    '<?= htmlspecialchars($token['assignedTo']['displayName'] ?? '') ?>',
-                                                                    '<?= htmlspecialchars($token['assignedTo']['id'] ?? '') ?>')">
+                                <button class="btn btn-sm btn-outline-success" onclick="openActivateModal('<?= htmlspecialchars($token['id']) ?>', '<?= htmlspecialchars($token['serialNumber']) ?>', '<?= htmlspecialchars($token['assignedTo']['displayName'] ?? '') ?>', '<?= htmlspecialchars($token['assignedTo']['id'] ?? '') ?>')">
                                     Activate
                                 </button>
                             <?php elseif ($token['status'] === 'activated'): ?>
@@ -491,52 +495,78 @@ $tokens = fetchHardwareTokens($accessToken);
     <script>
         let currentTokenId = '';
         let currentUserId = '';
-        let activationTimer;
 
         $(document).ready(function() {
             $('#tokensTable').DataTable({
                 "pageLength": 25,
                 "order": [[ 4, "desc" ]]
             });
-            
-            // Load users on page load
-            loadUsers();
-            
-            // User search functionality
-            $('#userSearch').on('input', function() {
-                const search = $(this).val();
-                if (search.length >= 2) {
-                    loadUsers(search);
-                } else if (search.length === 0) {
-                    loadUsers();
-                }
-            });
         });
 
-        function loadUsers(search = '') {
-            $.get('?action=get_users&search=' + encodeURIComponent(search))
+        function loadUsers() {
+            console.log('🔍 Loading users...');
+            
+            $.get('?action=get_users')
                 .done(function(data) {
+                    console.log('📦 Users API response:', data);
                     const select = $('#userSelect');
                     select.empty();
-                    select.append('<option value="">Select a user...</option>');
                     
-                    if (data.users) {
+                    if (data.success && data.users && data.users.length > 0) {
+                        select.append('<option value="">Select a user...</option>');
+                        
                         data.users.forEach(function(user) {
-                            select.append(`<option value="${user.id}">${user.displayName} (${user.userPrincipalName})</option>`);
+                            // Handle cases where displayName might be missing
+                            const displayName = user.displayName || user.userPrincipalName || 'Unknown User';
+                            const userPrincipal = user.userPrincipalName || user.mail || 'No UPN';
+                            
+                            select.append(`<option value="${user.id}" title="${userPrincipal}">${displayName} (${userPrincipal})</option>`);
                         });
+                        
+                        console.log(`✅ Successfully loaded ${data.users.length} users`);
+                        
+                        // Log first user for debugging
+                        if (data.users[0]) {
+                            console.log('👤 First user sample:', {
+                                id: data.users[0].id,
+                                displayName: data.users[0].displayName,
+                                userPrincipalName: data.users[0].userPrincipalName
+                            });
+                        }
+                        
+                    } else {
+                        console.warn('⚠️ No users found or API error:', data);
+                        
+                        let errorMsg = 'No users found';
+                        if (data.error) {
+                            errorMsg = data.error;
+                            console.error('❌ Detailed error:', data);
+                        }
+                        
+                        select.append(`<option value="" style="color: red;">${errorMsg}</option>`);
                     }
                 })
-                .fail(function() {
-                    $('#userSelect').html('<option value="">Error loading users</option>');
+                .fail(function(xhr, status, error) {
+                    console.error('❌ AJAX request failed:');
+                    console.error('Status:', status);
+                    console.error('Error:', error);
+                    console.error('Response:', xhr.responseText);
+                    console.error('HTTP Status:', xhr.status);
+                    
+                    const select = $('#userSelect');
+                    select.empty();
+                    select.append('<option value="" style="color: red;">Connection Error</option>');
+                    
+                    // Show detailed error
+                    alert(`Failed to load users!\n\nStatus: ${status}\nError: ${error}\nHTTP: ${xhr.status}\n\nCheck browser console for details.`);
                 });
         }
 
         function openAssignModal(tokenId, serialNumber) {
             currentTokenId = tokenId;
             $('#tokenSerial').val(serialNumber);
-            $('#userSelect').val('');
-            $('#userSearch').val('');
             $('#assignModal').modal('show');
+            loadUsers();
         }
 
         function openActivateModal(tokenId, serialNumber, userName, userId) {
@@ -546,37 +576,15 @@ $tokens = fetchHardwareTokens($accessToken);
             $('#activateUser').val(userName);
             $('#verificationCode').val('');
             $('#activateModal').modal('show');
-            
-            // Start countdown timer
-            startActivationTimer();
         }
 
-        function startActivationTimer() {
-            let timeLeft = 30; // 30 seconds countdown for TOTP
-            const timer = $('#activationTimer');
-            
-            activationTimer = setInterval(function() {
-                timer.text(`(Code expires in ${timeLeft}s)`);
-                timeLeft--;
-                
-                if (timeLeft < 0) {
-                    clearInterval(activationTimer);
-                    timer.text('(Code may have expired - get new code)');
-                }
-            }, 1000);
-        }
-
-        function assignToken() {
+        function assignTokenAction() {
             const userId = $('#userSelect').val();
-            
             if (!userId) {
                 alert('Please select a user');
                 return;
             }
 
-            const button = $('#assignModal .btn-primary');
-            button.prop('disabled', true).text('Assigning...');
-            
             $.post('?action=assign_token', {
                 token_id: currentTokenId,
                 user_id: userId
@@ -593,70 +601,46 @@ $tokens = fetchHardwareTokens($accessToken);
                 alert('Error occurred while assigning token');
             })
             .always(function() {
-                button.prop('disabled', false).text('Assign Token');
                 $('#assignModal').modal('hide');
             });
         }
 
         function activateTokenAction() {
-            const verificationCode = $('#verificationCode').val();
-            
-            if (!verificationCode || verificationCode.length !== 6) {
-                alert('Please enter a valid 6-digit verification code');
+            const code = $('#verificationCode').val();
+            if (!code || code.length !== 6) {
+                alert('Please enter a valid 6-digit code');
                 return;
             }
 
-            const button = $('#activateModal .btn-success');
-            button.prop('disabled', true).text('Activating...');
-            
-            // Clear timer
-            if (activationTimer) {
-                clearInterval(activationTimer);
-            }
-            
             $.post('?action=activate_token', {
                 token_id: currentTokenId,
                 user_id: currentUserId,
-                verification_code: verificationCode
+                verification_code: code
             })
             .done(function(data) {
                 if (data.success) {
                     alert('Token activated successfully!');
                     location.reload();
                 } else {
-                    alert('Failed to activate token. Please verify the code is correct and try again.');
+                    alert('Failed to activate token: ' + (data.error || 'Unknown error'));
                 }
             })
             .fail(function() {
                 alert('Error occurred while activating token');
             })
             .always(function() {
-                button.prop('disabled', false).text('Activate');
                 $('#activateModal').modal('hide');
             });
         }
-
-        // Close modal cleanup
-        $('#activateModal').on('hidden.bs.modal', function() {
-            if (activationTimer) {
-                clearInterval(activationTimer);
-            }
-        });
     </script>
 
-
-<br><br><hr>
-<!-- Footer -->
-<footer class="text-center text-lg-start bg-body-tertiary text-muted container mt-4">
-   
-
-  <!-- Copyright -->
-  <div class="text-center p-4" style="background-color: rgba(0, 0, 0, 0.05);">
-    Created by 
-    <a class="text-reset fw-bold" href="https://token2.swiss/">Token2 Sarl </a>
-  </div>
-  <!-- Copyright -->
-</footer>
-
+    <br><br><hr>
+    <!-- Footer -->
+    <footer class="text-center text-lg-start bg-body-tertiary text-muted container mt-4">
+        <div class="text-center p-4" style="background-color: rgba(0, 0, 0, 0.05);">
+            Created by 
+            <a class="text-reset fw-bold" href="https://token2.swiss/">Token2 Sarl </a>
+        </div>
+    </footer>
 </body>
 </html>
