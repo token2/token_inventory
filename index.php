@@ -3,9 +3,15 @@ session_start();
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+// Define whether running in local/PHP-Desktop environment
+define('LOCAL_APP', 1); // Set to 1 for PHP-Desktop, 0 for web server
+
 // Handle logout
 if (isset($_GET['logout'])) {
     session_destroy();
+    // Clear credential cookies
+    setcookie('tenantId', '', time() - 3600, '/', '', true, true);
+    setcookie('clientId', '', time() - 3600, '/', '', true, true);
     header('Location: ' . $_SERVER['PHP_SELF']);
     exit;
 }
@@ -13,9 +19,16 @@ if (isset($_GET['logout'])) {
 // Handle settings update via form submission
 if (isset($_GET['action']) && $_GET['action'] === 'update_settings_form') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $_SESSION['tenantId'] = trim($_POST['tenantId']);
-        $_SESSION['clientId'] = trim($_POST['clientId']);
-        $_SESSION['clientSecret'] = trim($_POST['clientSecret']);
+        $tenantId = trim($_POST['tenantId']);
+        $clientId = trim($_POST['clientId']);
+        $clientSecret = trim($_POST['clientSecret']);
+        
+        // Save tenant ID and client ID in cookies (30 days)
+        setcookie('tenantId', $tenantId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
+        setcookie('clientId', $clientId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
+        
+        // Keep only client secret in session
+        $_SESSION['clientSecret'] = $clientSecret;
         $_SESSION['showLogs'] = isset($_POST['showLogs']) ? true : false;
         
         // Redirect back to main page with success message
@@ -28,10 +41,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'update_settings_form') {
 if (isset($_GET['action']) && $_GET['action'] === 'update_settings') {
     header('Content-Type: application/json');
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $_SESSION['tenantId'] = trim($_POST['tenantId']);
-        $_SESSION['clientId'] = trim($_POST['clientId']);
-        $_SESSION['clientSecret'] = trim($_POST['clientSecret']);
+        $tenantId = trim($_POST['tenantId']);
+        $clientId = trim($_POST['clientId']);
+        $clientSecret = trim($_POST['clientSecret']);
+        
+        // Save tenant ID and client ID in cookies (30 days)
+        setcookie('tenantId', $tenantId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
+        setcookie('clientId', $clientId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
+        
+        // Keep only client secret in session
+        $_SESSION['clientSecret'] = $clientSecret;
         $_SESSION['showLogs'] = isset($_POST['showLogs']) ? true : false;
+        
         echo json_encode(['success' => true, 'message' => 'Settings updated successfully']);
     } else {
         echo json_encode(['success' => false, 'message' => 'Invalid request method']);
@@ -39,13 +60,25 @@ if (isset($_GET['action']) && $_GET['action'] === 'update_settings') {
     exit;
 }
 
+// Check for saved credentials in cookies
+$savedTenantId = $_COOKIE['tenantId'] ?? '';
+$savedClientId = $_COOKIE['clientId'] ?? '';
+
 // Ask for Microsoft credentials if not stored
-if (!isset($_SESSION['tenantId'], $_SESSION['clientId'], $_SESSION['clientSecret'])) {
+if (empty($savedTenantId) || empty($savedClientId) || !isset($_SESSION['clientSecret'])) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tenantId'])) {
-        $_SESSION['tenantId'] = trim($_POST['tenantId']);
-        $_SESSION['clientId'] = trim($_POST['clientId']);
-        $_SESSION['clientSecret'] = trim($_POST['clientSecret']);
+        $tenantId = trim($_POST['tenantId']);
+        $clientId = trim($_POST['clientId']);
+        $clientSecret = trim($_POST['clientSecret']);
+        
+        // Save tenant ID and client ID in cookies (30 days)
+        setcookie('tenantId', $tenantId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
+        setcookie('clientId', $clientId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
+        
+        // Keep only client secret in session
+        $_SESSION['clientSecret'] = $clientSecret;
         $_SESSION['showLogs'] = isset($_POST['showLogs']) ? true : false;
+        
         header('Location: ' . $_SERVER['PHP_SELF']);
         exit;
     }
@@ -66,15 +99,15 @@ echo '<!DOCTYPE html>
             <form method="POST">
                 <div class="form-group mb-3">
                     <label>Tenant ID:</label>
-                    <input type="text" name="tenantId" class="form-control" required>
+                    <input type="text" name="tenantId" class="form-control" value="' . htmlspecialchars($savedTenantId) . '" required>
                 </div>
                 <div class="form-group mb-3">
                     <label>Client ID:</label>
-                    <input type="text" name="clientId" class="form-control" required>
+                    <input type="text" name="clientId" class="form-control" value="' . htmlspecialchars($savedClientId) . '" required>
                 </div>
                 <div class="form-group mb-3">
                     <label>Client Secret:</label>
-                    <input type="text" name="clientSecret" class="form-control" required>
+                    <input type="password" name="clientSecret" class="form-control" required>
                 </div>
                 <div class="form-group mb-3">
                     <div class="form-check">
@@ -104,6 +137,8 @@ echo '<!DOCTYPE html>
 </div>
         </div>
     </div>
+</div><div style="position: fixed; bottom: 10px; right: 10px; font-size: 14px; color: #555;">
+  &copy; Token2
 </div>
 </body>
 </html>';
@@ -116,17 +151,18 @@ if (!isset($_SESSION['showLogs'])) {
     $_SESSION['showLogs'] = true;
 }
 
-// Credentials
-$tenantId = $_SESSION['tenantId'];
-$clientId = $_SESSION['clientId'];
-$clientSecret = $_SESSION['clientSecret'];
+// Credentials - get from cookies and session
+$tenantId = $_COOKIE['tenantId'] ?? '';
+$clientId = $_COOKIE['clientId'] ?? '';
+$clientSecret = $_SESSION['clientSecret'] ?? '';
 
 // Get Access Token
 function getAccessToken($tenantId, $clientId, $clientSecret)
 {
     $url = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token";
     $data = ['grant_type' => 'client_credentials', 'client_id' => $clientId, 'client_secret' => $clientSecret, 'scope' => 'https://graph.microsoft.com/.default'];
-    $ch = curl_init();
+    $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
@@ -165,7 +201,8 @@ function getAccessToken($tenantId, $clientId, $clientSecret)
 function fetchTokens($accessToken)
 {
     $url = "https://graph.microsoft.com/beta/directory/authenticationMethodDevices/hardwareOathDevices";
-    $ch = curl_init();
+    $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $accessToken", "Content-Type: application/json"]);
@@ -210,7 +247,8 @@ function fetchTokens($accessToken)
 function importTokens($accessToken, $data)
 {
     $url = "https://graph.microsoft.com/beta/directory/authenticationMethodDevices/hardwareOathDevices";
-    $ch = curl_init();
+    $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PATCH");
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
@@ -317,7 +355,8 @@ function importCSVTokens($accessToken, $csvData, $importMode = 'import_assign_ac
         ];
 
         $url = "https://graph.microsoft.com/beta/directory/authenticationMethodDevices/hardwareOathDevices";
-        $ch = curl_init();
+        $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($tokenData));
@@ -343,7 +382,7 @@ function importCSVTokens($accessToken, $csvData, $importMode = 'import_assign_ac
             $assignUrl = "https://graph.microsoft.com/beta/users/$upn/authentication/hardwareOathMethods";
             $assignData = ["device" => ["id" => $tokenId]];
 
-            $assignCh = curl_init();
+            $assignCh = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
             curl_setopt($assignCh, CURLOPT_URL, $assignUrl);
             curl_setopt($assignCh, CURLOPT_POST, true);
             curl_setopt($assignCh, CURLOPT_POSTFIELDS, json_encode($assignData));
@@ -363,7 +402,7 @@ function importCSVTokens($accessToken, $csvData, $importMode = 'import_assign_ac
                 $activateUrl = "https://graph.microsoft.com/beta/users/$upn/authentication/hardwareOathMethods/$tokenId/activate";
                 $activateData = ["verificationCode" => generateTOTPCode($secretKey)]; //  
 
-                $activateCh = curl_init();
+                $activateCh = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
                 curl_setopt($activateCh, CURLOPT_URL, $activateUrl);
                 curl_setopt($activateCh, CURLOPT_POST, true);
                 curl_setopt($activateCh, CURLOPT_POSTFIELDS, json_encode($activateData));
@@ -402,11 +441,11 @@ function getUsers($accessToken, $query = '') {
     
     $debugInfo['url'] = $url;
     
-    $ch = curl_init();
+    $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); } else { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true); }
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $accessToken", "Content-Type: application/json"]);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_VERBOSE, true);
     
@@ -489,7 +528,8 @@ function assignToken($accessToken, $userId, $tokenId)
 {
     $url = "https://graph.microsoft.com/beta/users/$userId/authentication/hardwareOathMethods";
     $data = ["device" => ["id" => $tokenId]];
-    $ch = curl_init();
+    $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
@@ -522,7 +562,8 @@ function activateToken($accessToken, $userId, $tokenId, $code)
 {
     $url = "https://graph.microsoft.com/beta/users/$userId/authentication/hardwareOathMethods/$tokenId/activate";
     $data = ["verificationCode" => $code];
-    $ch = curl_init();
+    $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
@@ -554,7 +595,8 @@ function activateToken($accessToken, $userId, $tokenId, $code)
 function unassignToken($accessToken, $userId, $tokenId)
 {
     $url = "https://graph.microsoft.com/beta/users/$userId/authentication/hardwareOathMethods/$tokenId";
-    $ch = curl_init();
+    $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $accessToken"]);
@@ -585,7 +627,8 @@ function unassignToken($accessToken, $userId, $tokenId)
 function deleteToken($accessToken, $tokenId)
 {
     $url = "https://graph.microsoft.com/beta/directory/authenticationMethodDevices/hardwareOathDevices/$tokenId";
-    $ch = curl_init();
+    $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $accessToken"]);
@@ -842,6 +885,15 @@ try {
     <script src="assets/bootstrap.min.js"></script>
 	<link rel="shortcut icon" href="favico.png">
     <style>
+	
+	body{
+    background-image:url('assets/bg.png');
+    background-attachment:fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+
         .log-container {
             max-height: 200px;
             overflow-y: auto;
@@ -1200,6 +1252,48 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
                 </div>
             </div>
         </div>
+        
+        <!-- General Message Modal -->
+        <div class="modal fade" id="messageModal">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 id="messageTitle" class="modal-title"></h5>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="messageIcon" class="text-center mb-3"></div>
+                        <p id="messageText"></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-dismiss="modal">OK</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Confirmation Modal -->
+        <div class="modal fade" id="confirmModal">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 id="confirmTitle" class="modal-title">Confirm Action</h5>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="text-center mb-3">
+                            <i class="text-warning" style="font-size: 3rem;">⚠️</i>
+                        </div>
+                        <p id="confirmText"></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger" id="confirmActionBtn">Confirm</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Response Modal -->
         <div class="modal fade" id="responseModal">
             <div class="modal-dialog modal-lg">
@@ -1254,10 +1348,10 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
                     <th>Serial</th>
                     <th>Device</th>
 					<th>Hash</th>
-						<th>Time interfal</th>
+						<th>Time</th>
                     <th>User</th>
                     <th>Status</th>
-                    <th>Last Used</th>
+                    <th>Seen</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -1271,7 +1365,7 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
                         <td><?= isset($t['assignedTo']['displayName']) ? htmlspecialchars($t['assignedTo']['displayName']) : 'Unassigned' ?></td>
                         <td><?= htmlspecialchars($t['status']) ?></td>
                         <td><?= htmlspecialchars($t['lastUsedDateTime'] ?? 'Never') ?></td>
-                        <td>
+                        <td width=33%>
                             <?php if (!isset($t['assignedTo']['id'])): ?>
                                 <button class="btn btn-sm btn-primary" onclick="openAssign('<?= $t['id'] ?>', '<?= $t['serialNumber'] ?>')">Assign</button>
                                 <button class="btn btn-sm btn-danger" onclick="deleteToken('<?= $t['id'] ?>')">Delete</button>
@@ -1286,7 +1380,10 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
                 <?php endforeach; ?>
             </tbody>
         </table>
-    </div>
+    </div><div style="position: fixed; bottom: 10px; right: 10px; font-size: 14px; color: #555;">
+  &copy; Token2
+</div>
+
     <!-- Loading Spinner -->
     <div class="loading-spinner" id="loadingSpinner">
         <div class="spinner"></div>
@@ -1303,6 +1400,58 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
             $.post = function() { console.error('jQuery post blocked'); return false; };
             $.get = function() { console.error('jQuery get blocked'); return false; };
             $.ajax = function() { console.error('jQuery ajax blocked'); return false; };
+        }
+        
+        // Modal helper functions
+        function showMessage(title, message, type = 'info') {
+            const icons = {
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️',
+                'info': 'ℹ️'
+            };
+            
+            document.getElementById('messageTitle').textContent = title;
+            document.getElementById('messageText').textContent = message;
+            document.getElementById('messageIcon').innerHTML = `<span style="font-size: 3rem;">${icons[type] || icons.info}</span>`;
+            $('#messageModal').modal('show');
+        }
+        
+        function showConfirm(title, message, onConfirm, confirmText = 'Confirm', confirmClass = 'btn-danger') {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmText').textContent = message;
+            
+            const confirmBtn = document.getElementById('confirmActionBtn');
+            confirmBtn.textContent = confirmText;
+            confirmBtn.className = `btn ${confirmClass}`;
+            
+            // Remove any existing event listeners
+            const newBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+            
+            // Add new event listener
+            newBtn.addEventListener('click', function() {
+                $('#confirmModal').modal('hide');
+                onConfirm();
+            });
+            
+            $('#confirmModal').modal('show');
+        }
+        
+        function validateRequired(fieldName, value, customMessage = null) {
+            if (!value || value.trim() === '') {
+                showMessage('Validation Error', customMessage || `${fieldName} is required.`, 'error');
+                return false;
+            }
+            return true;
+        }
+        
+        function validateCode(code) {
+            if (!code || code.length !== 6 || !/^\d{6}$/.test(code)) {
+                showMessage('Validation Error', 'Please enter a valid 6-digit verification code.', 'error');
+                return false;
+            }
+            return true;
         }
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -1363,10 +1512,11 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
                 e.preventDefault();
                 let csvData = this.querySelector('textarea[name="csv_data"]').value;
                 let importMode = document.querySelector('input[name="import_mode"]:checked').value;
-                if (!csvData.trim()) {
-                    alert('Please enter CSV data.');
+                
+                if (!validateRequired('CSV data', csvData)) {
                     return;
                 }
+                
                 showLoading();
                 
                 // Use vanilla XMLHttpRequest to avoid jQuery issues
@@ -1384,18 +1534,18 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
                                 if (showLogsEnabled) {
                                     showResponse('Import CSV Tokens', 'CSV Tokens imported (Mode: ' + importMode + ')', d.log);
                                 } else {
-                                    alert('CSV Tokens imported successfully (Mode: ' + importMode + ')');
-                                    location.reload();
+                                    showMessage('Import Successful', 'CSV Tokens imported successfully (Mode: ' + importMode + ')', 'success');
+                                    setTimeout(() => location.reload(), 1500);
                                 }
                             } catch (e) {
-                                alert('Import completed but response was invalid');
-                                location.reload();
+                                showMessage('Import Completed', 'Import completed but response was invalid', 'warning');
+                                setTimeout(() => location.reload(), 1500);
                             }
                         } else {
                             if (showLogsEnabled) {
                                 showResponse('Error', 'Failed to import CSV tokens', {});
                             } else {
-                                alert('Failed to import CSV tokens');
+                                showMessage('Import Failed', 'Failed to import CSV tokens', 'error');
                             }
                         }
                     }
@@ -1411,7 +1561,7 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
                 let fileInput = this.querySelector('input[name="csvFile"]');
                 if (!fileInput.files.length) {
                     e.preventDefault();
-                    alert('Please select a CSV file.');
+                    showMessage('File Required', 'Please select a CSV file.', 'error');
                     return;
                 }
                 showLoading();
@@ -1581,10 +1731,11 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
 
         function assignTokenAction() {
             let uid = document.getElementById('selectedUserId').value;
-            if (!uid) {
-                alert('Please select a user.');
+            
+            if (!validateRequired('User selection', uid, 'Please select a user.')) {
                 return;
             }
+            
             showLoading();
             
             // Use vanilla XMLHttpRequest to avoid jQuery issues
@@ -1603,31 +1754,33 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
                             
                             // Check for credential errors
                             if (d.credential_error) {
-                                alert('Authentication Error: ' + d.error + '\n\nPlease check your credentials in Settings.');
+                                showMessage('Authentication Error', d.error + '\n\nPlease check your credentials in Settings.', 'error');
                                 return;
                             }
                             
                             // Check for permission errors
                             if (d.permission_error) {
-                                alert('Permission Error: ' + d.permission_error + '\n\nPlease add the required permissions in Azure Portal → App Registrations → API permissions.');
+                                showMessage('Permission Error', d.permission_error + '\n\nPlease add the required permissions in Azure Portal → App Registrations → API permissions.', 'error');
                                 return;
                             }
                             
                             if (showLogsEnabled) {
                                 showResponse('Assign Token', d.success ? 'Token assigned successfully!' : 'Failed to assign token', d.log);
                             } else {
-                                alert(d.success ? 'Token assigned successfully!' : 'Failed to assign token');
-                                if (d.success) location.reload();
+                                showMessage('Assignment ' + (d.success ? 'Successful' : 'Failed'), 
+                                          d.success ? 'Token assigned successfully!' : 'Failed to assign token', 
+                                          d.success ? 'success' : 'error');
+                                if (d.success) setTimeout(() => location.reload(), 1500);
                             }
                         } catch (e) {
-                            alert('Assignment completed but response was invalid');
-                            location.reload();
+                            showMessage('Assignment Completed', 'Assignment completed but response was invalid', 'warning');
+                            setTimeout(() => location.reload(), 1500);
                         }
                     } else {
                         if (showLogsEnabled) {
                             showResponse('Error', 'Failed to assign token', {});
                         } else {
-                            alert('Failed to assign token');
+                            showMessage('Assignment Failed', 'Failed to assign token', 'error');
                         }
                     }
                 }
@@ -1640,10 +1793,11 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
 
         function activateTokenAction() {
             let code = document.getElementById('verCode').value;
-            if (!code || code.length !== 6) {
-                alert('Please enter a valid 6-digit verification code.');
+            
+            if (!validateCode(code)) {
                 return;
             }
+            
             showLoading();
             
             // Use vanilla XMLHttpRequest to avoid jQuery issues
@@ -1662,31 +1816,33 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
                             
                             // Check for credential errors
                             if (d.credential_error) {
-                                alert('Authentication Error: ' + d.error + '\n\nPlease check your credentials in Settings.');
+                                showMessage('Authentication Error', d.error + '\n\nPlease check your credentials in Settings.', 'error');
                                 return;
                             }
                             
                             // Check for permission errors
                             if (d.permission_error) {
-                                alert('Permission Error: ' + d.permission_error + '\n\nPlease add the required permissions in Azure Portal → App Registrations → API permissions.');
+                                showMessage('Permission Error', d.permission_error + '\n\nPlease add the required permissions in Azure Portal → App Registrations → API permissions.', 'error');
                                 return;
                             }
                             
                             if (showLogsEnabled) {
                                 showResponse('Activate Token', d.success ? 'Token activated successfully!' : 'Failed to activate token', d.log);
                             } else {
-                                alert(d.success ? 'Token activated successfully!' : 'Failed to activate token');
-                                if (d.success) location.reload();
+                                showMessage('Activation ' + (d.success ? 'Successful' : 'Failed'), 
+                                          d.success ? 'Token activated successfully!' : 'Failed to activate token', 
+                                          d.success ? 'success' : 'error');
+                                if (d.success) setTimeout(() => location.reload(), 1500);
                             }
                         } catch (e) {
-                            alert('Activation completed but response was invalid');
-                            location.reload();
+                            showMessage('Activation Completed', 'Activation completed but response was invalid', 'warning');
+                            setTimeout(() => location.reload(), 1500);
                         }
                     } else {
                         if (showLogsEnabled) {
                             showResponse('Error', 'Failed to activate token', {});
                         } else {
-                            alert('Failed to activate token');
+                            showMessage('Activation Failed', 'Failed to activate token', 'error');
                         }
                     }
                 }
@@ -1699,112 +1855,128 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
         }
 
         function unassignToken(token, user) {
-            if (confirm('Are you sure you want to unassign this token?')) {
-                showLoading();
-                
-                // Use vanilla XMLHttpRequest to avoid jQuery issues
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', '?action=unassign_token', true);
-                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                
-                xhr.onreadystatechange = function() {
-                    if (xhr.readyState === 4) {
-                        hideLoading();
-                        
-                        if (xhr.status === 200) {
-                            try {
-                                var d = JSON.parse(xhr.responseText);
-                                
-                                // Check for credential errors
-                                if (d.credential_error) {
-                                    alert('Authentication Error: ' + d.error + '\n\nPlease check your credentials in Settings.');
-                                    return;
+            showConfirm(
+                'Unassign Token',
+                'Are you sure you want to unassign this token?',
+                function() {
+                    showLoading();
+                    
+                    // Use vanilla XMLHttpRequest to avoid jQuery issues
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '?action=unassign_token', true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState === 4) {
+                            hideLoading();
+                            
+                            if (xhr.status === 200) {
+                                try {
+                                    var d = JSON.parse(xhr.responseText);
+                                    
+                                    // Check for credential errors
+                                    if (d.credential_error) {
+                                        showMessage('Authentication Error', d.error + '\n\nPlease check your credentials in Settings.', 'error');
+                                        return;
+                                    }
+                                    
+                                    // Check for permission errors
+                                    if (d.permission_error) {
+                                        showMessage('Permission Error', d.permission_error + '\n\nPlease add the required permissions in Azure Portal → App Registrations → API permissions.', 'error');
+                                        return;
+                                    }
+                                    
+                                    if (showLogsEnabled) {
+                                        showResponse('Unassign Token', d.success ? 'Token unassigned successfully!' : 'Failed to unassign token', d.log);
+                                    } else {
+                                        showMessage('Unassignment ' + (d.success ? 'Successful' : 'Failed'), 
+                                                  d.success ? 'Token unassigned successfully!' : 'Failed to unassign token', 
+                                                  d.success ? 'success' : 'error');
+                                        if (d.success) setTimeout(() => location.reload(), 1500);
+                                    }
+                                } catch (e) {
+                                    showMessage('Unassignment Completed', 'Unassignment completed but response was invalid', 'warning');
+                                    setTimeout(() => location.reload(), 1500);
                                 }
-                                
-                                // Check for permission errors
-                                if (d.permission_error) {
-                                    alert('Permission Error: ' + d.permission_error + '\n\nPlease add the required permissions in Azure Portal → App Registrations → API permissions.');
-                                    return;
-                                }
-                                
-                                if (showLogsEnabled) {
-                                    showResponse('Unassign Token', d.success ? 'Token unassigned successfully!' : 'Failed to unassign token', d.log);
-                                } else {
-                                    alert(d.success ? 'Token unassigned successfully!' : 'Failed to unassign token');
-                                    if (d.success) location.reload();
-                                }
-                            } catch (e) {
-                                alert('Unassignment completed but response was invalid');
-                                location.reload();
-                            }
-                        } else {
-                            if (showLogsEnabled) {
-                                showResponse('Error', 'Failed to unassign token', {});
                             } else {
-                                alert('Failed to unassign token');
+                                if (showLogsEnabled) {
+                                    showResponse('Error', 'Failed to unassign token', {});
+                                } else {
+                                    showMessage('Unassignment Failed', 'Failed to unassign token', 'error');
+                                }
                             }
                         }
-                    }
-                };
-                
-                var formData = 'token_id=' + encodeURIComponent(token) + 
-                              '&user_id=' + encodeURIComponent(user);
-                xhr.send(formData);
-            }
+                    };
+                    
+                    var formData = 'token_id=' + encodeURIComponent(token) + 
+                                  '&user_id=' + encodeURIComponent(user);
+                    xhr.send(formData);
+                },
+                'Unassign',
+                'btn-warning'
+            );
         }
 
         function deleteToken(token) {
-            if (confirm('Are you sure you want to delete this token? This action cannot be undone.')) {
-                showLoading();
-                
-                // Use vanilla XMLHttpRequest to avoid jQuery issues
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', '?action=delete_token', true);
-                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                
-                xhr.onreadystatechange = function() {
-                    if (xhr.readyState === 4) {
-                        hideLoading();
-                        
-                        if (xhr.status === 200) {
-                            try {
-                                var d = JSON.parse(xhr.responseText);
-                                
-                                // Check for credential errors
-                                if (d.credential_error) {
-                                    alert('Authentication Error: ' + d.error + '\n\nPlease check your credentials in Settings.');
-                                    return;
+            showConfirm(
+                'Delete Token',
+                'Are you sure you want to delete this token? This action cannot be undone.',
+                function() {
+                    showLoading();
+                    
+                    // Use vanilla XMLHttpRequest to avoid jQuery issues
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', '?action=delete_token', true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState === 4) {
+                            hideLoading();
+                            
+                            if (xhr.status === 200) {
+                                try {
+                                    var d = JSON.parse(xhr.responseText);
+                                    
+                                    // Check for credential errors
+                                    if (d.credential_error) {
+                                        showMessage('Authentication Error', d.error + '\n\nPlease check your credentials in Settings.', 'error');
+                                        return;
+                                    }
+                                    
+                                    // Check for permission errors
+                                    if (d.permission_error) {
+                                        showMessage('Permission Error', d.permission_error + '\n\nPlease add the required permissions in Azure Portal → App Registrations → API permissions.', 'error');
+                                        return;
+                                    }
+                                    
+                                    if (showLogsEnabled) {
+                                        showResponse('Delete Token', d.success ? 'Token deleted successfully!' : 'Failed to delete token', d.log);
+                                    } else {
+                                        showMessage('Deletion ' + (d.success ? 'Successful' : 'Failed'), 
+                                                  d.success ? 'Token deleted successfully!' : 'Failed to delete token', 
+                                                  d.success ? 'success' : 'error');
+                                        if (d.success) setTimeout(() => location.reload(), 1500);
+                                    }
+                                } catch (e) {
+                                    showMessage('Deletion Completed', 'Deletion completed but response was invalid', 'warning');
+                                    setTimeout(() => location.reload(), 1500);
                                 }
-                                
-                                // Check for permission errors
-                                if (d.permission_error) {
-                                    alert('Permission Error: ' + d.permission_error + '\n\nPlease add the required permissions in Azure Portal → App Registrations → API permissions.');
-                                    return;
-                                }
-                                
-                                if (showLogsEnabled) {
-                                    showResponse('Delete Token', d.success ? 'Token deleted successfully!' : 'Failed to delete token', d.log);
-                                } else {
-                                    alert(d.success ? 'Token deleted successfully!' : 'Failed to delete token');
-                                    if (d.success) location.reload();
-                                }
-                            } catch (e) {
-                                alert('Deletion completed but response was invalid');
-                                location.reload();
-                            }
-                        } else {
-                            if (showLogsEnabled) {
-                                showResponse('Error', 'Failed to delete token', {});
                             } else {
-                                alert('Failed to delete token');
+                                if (showLogsEnabled) {
+                                    showResponse('Error', 'Failed to delete token', {});
+                                } else {
+                                    showMessage('Deletion Failed', 'Failed to delete token', 'error');
+                                }
                             }
                         }
-                    }
-                };
-                
-                var formData = 'token_id=' + encodeURIComponent(token);
-                xhr.send(formData);
-            }
+                    };
+                    
+                    var formData = 'token_id=' + encodeURIComponent(token);
+                    xhr.send(formData);
+                },
+                'Delete',
+                'btn-danger'
+            );
         }
 
         function showResponse(title, message, log) {
