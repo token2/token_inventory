@@ -1,84 +1,125 @@
-
-# Entra ID - Hardware token inventory portal
-
-## Overview
-
-This is a simple, lightweight web application built in PHP to manage hardware OATH tokens using the Microsoft Graph API. It includes features such as listing tokens, importing token configurations via JSON files, and providing an intuitive and responsive interface with Bootstrap.
-
----
-This repository serves as an excellent example of leveraging the Microsoft Graph API programmatically, going beyond the basic capabilities of the Graph API Explorer. By integrating direct API calls into a functional PHP application, it demonstrates how developers can interact with Microsoft Graph to manage hardware OATH tokens in real-world scenarios. The application showcases practical use cases such as fetching token details, importing configurations via JSON, and providing an intuitive UI for users—all while illustrating how to securely authenticate and work with the Graph API in a production-ready environment. 
-
-## Features
-- **Authentication**:
-  - Form-based password protection for secure access.
-- **Token Management**:
-  - View a list of hardware OATH tokens.
-  - Includes key details like Serial Number, Device (Manufacturer/Model), Assigned User, Status, and Last Used.
-- **Import Functionality**:
-  - Upload and import tokens using a JSON file.
-- **Responsive Design**:
-  - Utilizes [Bootstrap](https://getbootstrap.com/) for a clean and responsive UI.
-- **Interactive Table**:
-  - Integrated with [DataTables](https://datatables.net/) for sorting, searching, and pagination.
-
+# TOTP Token Inventory: Automate Token2 Classic OATH Token Activation in Microsoft Entra ID
 
 ---
 
-## Usage
-1. **Login**:
-   - Access the portal using the predefined username and password (`admin/password123` by default).
-   - Update these credentials in `index.php`.
+## **🚀 Key Feature: Automatic Token Activation**
+The **TOTP Token Inventory** app now supports **automatic activation** of Token2 Classic OATH tokens during CSV upload. When tokens are assigned to users in the CSV, the app will:
+- Retrieve the **secret key** of each token.
+- Calculate the **current OTP code** (for both SHA-1 and SHA-256).
+- Send the code to **Microsoft Graph API** for activation.
 
-2. **Import Tokens**:
-   - Use the **Import Tokens** button to upload a JSON file with the token details. This format is available in Token2's seed request form. More information is available [here](https://www.token2.swiss/site/page/classic-hardware-tokens-for-entra-id-mfa-graph-api-method-with-self-service-and-sha-256-tokens-support). 
-   - Example JSON format:
-     ```json
-     [
-         {
-             "serialNumber": "8659623852751",
-             "secretKey": "ABC1234567890DEF",
-             "manufacturer": "Token2",
-             "model": "C202",
-             "timeIntervalInSeconds": 30,
-             "hashFunction": "hmacsha1"
-         }
-     ]
-     ```
-
-3. **View Tokens**:
-   - Explore the table with token details.
-   - Use search and sorting features provided by DataTables for quick navigation.
+This **eliminates the need for separate bulk activation tools**, making deployment **faster and more efficient**.
 
 ---
 
-## Screenshots
-**Login Page**  
-![image](https://github.com/user-attachments/assets/30217393-4866-4c4b-913b-dab73707596c)
-
-
-**Token List**  
-![image](https://github.com/user-attachments/assets/f47964c6-eb82-42cc-b480-b3070d4c078b)
-
-
-**Import Modal**  
-![image](https://github.com/user-attachments/assets/1cdddb63-9644-4f04-b4d8-66ca4fe20580)
-
+## **1. Overview**
+The **TOTP Token Inventory** app is a **powerful, open-source PHP tool** designed to **automate the management and activation** of **Token2 Classic OATH hardware tokens** in Microsoft Entra ID (Azure AD). Unlike Microsoft’s official tools, this app offers:
+- A **user-friendly web interface**.
+- **Bulk operations** (CSV/JSON import).
+- **Automatic token activation** during CSV upload.
+- **Self-service activation** for end users.
+- **SHA-1 and SHA-256 support**.
+- **Detailed logging** for auditing.
 
 ---
 
+## **2. Comparison: TOTP Token Inventory vs. Microsoft’s Official Tools**
 
-## License
-This project is open-source and available under the [MIT License](LICENSE).
+| Feature                     | Microsoft CSV Blade (Admin Center) | Microsoft Graph API | TOTP Token Inventory (PHP App) |
+|-----------------------------|-----------------------------------|---------------------|--------------------------------|
+| **Automatic Activation**    | ❌ No                              | ❌ No                | ✅ **Yes** (during CSV upload) |
+| **Bulk Import**             | ✅ Yes (CSV only)                 | ✅ Yes               | ✅ **Yes** (CSV/JSON)          |
+| **Self-Service Activation** | ❌ No                              | ✅ Yes               | ✅ **Yes**                     |
+| **SHA-256 Support**         | ❌ No                              | ✅ Yes               | ✅ **Yes**                     |
+| **User-Friendly UI**         | ✅ Basic                           | ❌ No (API only)     | ✅ **Full Web UI**             |
+| **Detailed Logging**        | ❌ No                              | ❌ No                | ✅ **Yes**                     |
+| **No Scripting Required**   | ✅ Yes                             | ❌ No                | ✅ **Yes**                     |
+| **Open-Source**             | ❌ No                              | ❌ No                | ✅ **Yes**                     |
+| **Bundled Windows App**     | ❌ No                              | ❌ No                | ✅ **Yes**                     |
 
 ---
 
-## Acknowledgments
-- [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview)
-- [Token2](https://www.token2.com) for hardware tokens
-- [Bootstrap](https://getbootstrap.com/) for responsive design
-- [DataTables](https://datatables.net/) for interactive table functionality
+## **3. Why Choose TOTP Token Inventory?**
+- **Automatic Activation**: The **only solution** that activates tokens during CSV import, eliminating manual steps.
+- **User-Friendly**: No scripting required; accessible via a **web UI**.
+- **Bulk Operations**: Import and assign **hundreds of tokens at once**.
+- **Self-Service**: Users activate tokens **without admin intervention**.
+- **SHA-256 Support**: Handles both **SHA-1 and SHA-256** tokens.
+- **Open-Source**: Free to use, modify, and deploy.
+- **Bundled App**: Run on **Windows without a server** using PHPDesktop.
 
 ---
 
-## Contact
-For any questions or suggestions, please contact me via support {at} token2.com or open an issue in this repository.
+## **4. Pre-Requisites**
+- **Server**: Works on **any server with PHP 7.4+** (Linux/Windows).
+- **Bundled App**: Also available as a **PHPDesktop-based Windows app** (no server required).
+- **Microsoft Entra ID**:
+  - **Tenant ID**, **Client ID**, and **Client Secret** (from an App Registration with **Graph API permissions**).
+  - **Required permissions**:
+    - `Policy.ReadWrite.AuthenticationMethod`
+    - `UserAuthenticationMethod.ReadWrite.All`
+    - `User.Read.All`
+    - `Directory.Read.All`
+  - **Admin consent** for the above permissions.
+- **Token2 Classic Tokens**: **CSV file** with token details (serial number, secret key, UPN, etc.).
+  - **CSVs for factory-set seeds are provided by Token2** via the seed request procedure.
+
+---
+
+## **5. Supported Formats**
+
+| Format  | Use Case                                  | Description                                                                                     |
+|---------|-------------------------------------------|-------------------------------------------------------------------------------------------------|
+| **CSV**  | Bulk import with pre-assignment and **automatic activation** | Admins can **pre-assign tokens to users** in the CSV. The app **automatically activates** these tokens by calculating the OTP code and sending it to Graph API. **CSVs for factory-set seeds are provided by Token2**. |
+| **JSON** | Self-service repository                   | Tokens are uploaded to a **shared repository**. Users activate them via **Security Info**.     |
+
+---
+
+## **6. Step-by-Step Guide**
+
+### **A. Initial Setup**
+1. **Download and install**:
+   - Deploy on a **PHP server** or use the **bundled Windows app**.
+2. **Enter credentials**:
+   - Provide your **Tenant ID**, **Client ID**, and **Client Secret**.
+3. **Verify permissions**:
+   - Ensure the app has the required **Graph API permissions** and admin consent.
+
+### **B. Importing Tokens**
+1. **Prepare your CSV**:
+   - Include columns: `upn`, `serial number`, `secret key`, `timeinterval`, `manufacturer`, `model`.
+   - **Pre-assign tokens** by including user UPNs. The app will **automatically activate** these tokens.
+   - **CSVs for factory-set seeds are provided by Token2** via the seed request procedure.
+2. **Upload CSV/JSON**:
+   - Use the **web interface** to upload your file.
+   - The app **automatically converts CSV to JSON** for Graph API and **activates pre-assigned tokens**.
+
+### **C. Assigning Tokens**
+- **Search for users** and assign tokens via the **web UI**.
+- **Bulk assignment**: Assign multiple tokens at once using the CSV pre-assignment feature.
+
+### **D. Activating Tokens**
+- **Automatic activation**: When tokens are pre-assigned in the CSV, the app **automatically activates them** by calculating the OTP code and sending it to Graph API.
+- **User self-service**: Users activate tokens via the **web form** or their **Security Info page**.
+- **Auto-generation**: The app can **auto-generate TOTP codes** from the secret key for activation.
+
+### **E. Managing Tokens**
+- **Unassign/Delete**: Remove tokens from users or delete them permanently.
+- **Logs**: View detailed logs for all operations.
+
+---
+
+## **7. Best Practices**
+- **Backup credentials**: Store your **Client Secret** securely.
+- **Test with a small batch**: Validate the workflow before bulk importing.
+- **Monitor logs**: Use logs to audit operations and troubleshoot issues.
+- **Keep permissions updated**: Ensure Graph API permissions are current.
+
+---
+
+## **8. Conclusion**
+The **TOTP Token Inventory** app is the **only solution** that offers **automatic token activation** during CSV import, making it the **most efficient way** to deploy and manage **Token2 Classic OATH tokens** in Microsoft Entra ID. With its **user-friendly interface**, **bulk operations**, and **self-service activation**, it provides a **complete, scalable, and auditable** solution for organizations of all sizes.
+
+**Say goodbye to manual activation processes—TOTP Token Inventory automates everything.**
+
+ 
