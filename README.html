@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOTP Token Inventory: Automate Token2 Classic OATH Token Activation in Microsoft Entra ID</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .highlight {
+            background-color: #e6f7ff;
+            padding: 15px;
+            border-left: 4px solid #0056b3;
+            margin: 20px 0;
+        }
+        .code {
+            background-color: #f4f4f4;
+            padding: 10px;
+            font-family: monospace;
+            border-radius: 4px;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #0056b3;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .btn:hover {
+            background-color: #003d7a;
+        }
+    </style>
+</head>
+<body>
+    <h1>TOTP Token Inventory: Automate Token2 Classic OATH Token Activation in Microsoft Entra ID</h1>
+
+    <div class="highlight">
+        <h2>Introducing Automatic Token Activation</h2>
+        <p>The <strong>TOTP Token Inventory</strong> app now supports <strong>automatic activation</strong> of Token2 Classic OATH tokens during CSV upload. When tokens are assigned to users in the CSV, the app will:</p>
+        <ul>
+            <li>Retrieve the <strong>secret key</strong> of each token.</li>
+            <li>Calculate the <strong>current OTP code</strong> (for both SHA-1 and SHA-256).</li>
+            <li>Send the code to <strong>Microsoft Graph API</strong> for activation.</li>
+        </ul>
+        <p>This eliminates the need for separate bulk activation tools, making deployment faster and more efficient.</p>
+    </div>
+
+    <h2>1. Overview</h2>
+    <p>The <strong>TOTP Token Inventory</strong> app is a <strong>powerful, open-source PHP tool</strong> designed to <strong>automate the management and activation</strong> of <strong>Token2 Classic OATH hardware tokens</strong> in Microsoft Entra ID (Azure AD). Unlike Microsoft’s official tools, this app offers a <strong>user-friendly web interface</strong>, <strong>bulk operations</strong>, and—most importantly—<strong>automatic token activation</strong> during CSV import, removing the need for manual or separate activation processes.</p>
+
+    <h2>2. Key Feature: Automatic Token Activation</h2>
+    <p>When uploading a CSV file with tokens <strong>pre-assigned to users</strong>, the TOTP Token Inventory app will:</p>
+    <ol>
+        <li>Read the <strong>secret key</strong> and <strong>serial number</strong> from the CSV.</li>
+        <li>Calculate the <strong>current OTP code</strong> using the secret key (supports both SHA-1 and SHA-256).</li>
+        <li>Send the OTP code to <strong>Microsoft Graph API</strong> to activate the token for the assigned user.</li>
+    </ol>
+    <p>This feature <strong>eliminates the need for our previous bulk activation tools</strong>, making the entire process seamless and efficient.</p>
+
+    <h2>3. Comparison: TOTP Token Inventory vs. Microsoft’s Official Tools</h2>
+
+    <h3>A. Microsoft’s CSV-Based OATH Tokens Blade (Admin Center)</h3>
+    <ul>
+        <li><strong>How it works</strong>: Admins upload a CSV file via the <strong>Entra Admin Center</strong> to import and assign tokens.</li>
+        <li><strong>Limitations</strong>:
+            <ul>
+                <li><strong>Manual process</strong>: No automation or self-service for end users.</li>
+                <li><strong>No bulk assignment</strong>: Admins must manually assign tokens to users after import.</li>
+                <li><strong>No automatic activation</strong>: Requires separate steps for token activation.</li>
+                <li><strong>No SHA-256 support</strong>: Limited to basic token configurations.</li>
+                <li><strong>No logging</strong>: Lacks detailed operation logs for auditing.</li>
+            </ul>
+        </li>
+        <li><strong>Best for</strong>: Small-scale deployments with minimal automation needs.</li>
+    </ul>
+
+    <h3>B. Microsoft Graph API (Preview)</h3>
+    <ul>
+        <li><strong>How it works</strong>: Admins use <strong>Graph API endpoints</strong> to upload, assign, activate, and delete tokens programmatically.</li>
+        <li><strong>Advantages</strong>:
+            <ul>
+                <li>Supports <strong>bulk operations</strong> via API calls.</li>
+                <li>Enables <strong>self-service activation</strong> for end users.</li>
+                <li>Supports <strong>SHA-256</strong> and advanced token configurations.</li>
+            </ul>
+        </li>
+        <li><strong>Limitations</strong>:
+            <ul>
+                <li><strong>Requires scripting</strong>: Admins must write and maintain PowerShell, Python, or other scripts.</li>
+                <li><strong>No UI</strong>: API-only; not accessible to non-technical users.</li>
+                <li><strong>No automatic activation</strong>: Requires manual or scripted activation steps.</li>
+            </ul>
+        </li>
+        <li><strong>Best for</strong>: Organizations with <strong>technical resources</strong> for scripting and automation.</li>
+    </ul>
+
+    <h3>C. TOTP Token Inventory (PHP App)</h3>
+    <ul>
+        <li><strong>How it works</strong>: A <strong>web-based PHP app</strong> that uses <strong>Microsoft Graph API</strong> under the hood, providing a <strong>user-friendly interface</strong> for bulk import, assignment, <strong>automatic activation</strong>, and deletion of tokens.</li>
+        <li><strong>Advantages</strong>:
+            <ul>
+                <li><strong>Automatic token activation</strong>: When tokens are assigned to users in the CSV, the app <strong>automatically activates them</strong> by calculating the OTP code and sending it to Graph API (supports SHA-1 and SHA-256).</li>
+                <li><strong>Bulk CSV/JSON import</strong>: Upload hundreds of tokens at once.
+                    <ul>
+                        <li><strong>CSV format</strong>: Used for <strong>pre-assignment</strong> (admins can assign tokens to users in the CSV).</li>
+                        <li><strong>JSON format</strong>: Used for <strong>self-service</strong> (tokens are uploaded to a shared repository; users activate them via their Security Info page).</li>
+                        <li><strong>Automatic conversion</strong>: The app converts CSV to JSON for Graph API, simplifying the process.</li>
+                    </ul>
+                </li>
+                <li><strong>Self-service activation</strong>: Users activate tokens via a <strong>web form</strong> or their <strong>Security Info page</strong>.</li>
+                <li><strong>SHA-256 support</strong>: Auto-detects and handles both <strong>SHA-1 and SHA-256</strong> tokens.</li>
+                <li><strong>Detailed logging</strong>: Tracks all operations (import, assign, activate, delete) for auditing.</li>
+                <li><strong>No scripting required</strong>: Accessible to <strong>non-technical admins</strong> via a web UI.</li>
+                <li><strong>Open-source</strong>: Free to use, modify, and deploy.</li>
+                <li><strong>Bundled app</strong>: Available as a <strong>PHPDesktop-based Windows app</strong>—no server required.</li>
+            </ul>
+        </li>
+        <li><strong>Best for</strong>: Organizations needing a <strong>scalable, user-friendly, and automated</strong> solution for <strong>Token2 Classic OATH tokens</strong>.</li>
+    </ul>
+
+    <div class="highlight">
+        <h3>Why Choose TOTP Token Inventory?</h3>
+        <p>Our app is the <strong>only solution</strong> that offers <strong>automatic token activation</strong> during CSV import, eliminating the need for separate bulk activation tools. Combined with a <strong>user-friendly interface</strong>, <strong>bulk operations</strong>, and <strong>self-service activation</strong>, it provides a <strong>complete, efficient, and auditable</strong> way to manage Token2 Classic OATH tokens.</p>
+    </div>
+
+    <h2>4. Pre-Requisites</h2>
+    <ul>
+        <li><strong>Server</strong>: Works on <strong>any server with PHP 7.4+</strong> (Linux/Windows).</li>
+        <li><strong>Bundled App</strong>: We also provide a <strong>PHPDesktop-based Windows app</strong>, so you can <strong>download and run it directly</strong> on a Windows machine <strong>without a server</strong>.</li>
+        <li><strong>Microsoft Entra ID</strong>:
+            <ul>
+                <li><strong>Tenant ID</strong>, <strong>Client ID</strong>, and <strong>Client Secret</strong> (from an App Registration with <strong>Graph API permissions</strong>).</li>
+                <li><strong>Required permissions</strong>:
+                    <ul>
+                        <li><code>Policy.ReadWrite.AuthenticationMethod</code></li>
+                        <li><code>UserAuthenticationMethod.ReadWrite.All</code></li>
+                        <li><code>User.Read.All</code></li>
+                        <li><code>Directory.Read.All</code></li>
+                    </ul>
+                </li>
+                <li><strong>Admin consent</strong> for the above permissions.</li>
+            </ul>
+        </li>
+        <li><strong>Token2 Classic Tokens</strong>: <strong>CSV file with token details</strong> (serial number, secret key, UPN, etc.). <strong>CSVs for factory-set seeds will be provided by Token2 via the seed request procedure</strong>.</li>
+    </ul>
+
+    <h2>5. Supported Formats</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Format</th>
+                <th>Use Case</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>CSV</strong></td>
+                <td>Bulk import with pre-assignment and automatic activation</td>
+                <td>Admins can <strong>pre-assign tokens to users</strong> in the CSV. The app will <strong>automatically activate</strong> these tokens by calculating the OTP code and sending it to Graph API. <strong>CSVs for factory-set seeds are provided by Token2</strong>.</td>
+            </tr>
+            <tr>
+                <td><strong>JSON</strong></td>
+                <td>Self-service repository</td>
+                <td>Tokens are uploaded to a <strong>shared repository</strong>. Users activate them via <strong>Security Info</strong>.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>6. Step-by-Step: Using TOTP Token Inventory</h2>
+
+    <h3>A. Initial Setup</h3>
+    <ol>
+        <li><strong>Download and install</strong>:
+            <ul>
+                <li>Deploy on a <strong>PHP server</strong> or use the <strong>bundled Windows app</strong>.</li>
+            </ul>
+        </li>
+        <li><strong>Enter credentials</strong>:
+            <ul>
+                <li>Provide your <strong>Tenant ID</strong>, <strong>Client ID</strong>, and <strong>Client Secret</strong>.</li>
+            </ul>
+        </li>
+        <li><strong>Verify permissions</strong>:
+            <ul>
+                <li>Ensure the app has the required <strong>Graph API permissions</strong> and admin consent.</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>B. Importing Tokens</h3>
+    <ol>
+        <li><strong>Prepare your CSV</strong>:
+            <ul>
+                <li>Include columns: <code>upn</code>, <code>serial number</code>, <code>secret key</code>, <code>timeinterval</code>, <code>manufacturer</code>, <code>model</code>.</li>
+                <li>Optionally, <strong>pre-assign tokens</strong> by including user UPNs. The app will <strong>automatically activate</strong> these tokens.</li>
+                <li><strong>CSVs for factory-set seeds are provided by Token2</strong> via the seed request procedure.</li>
+            </ul>
+        </li>
+        <li><strong>Upload CSV/JSON</strong>:
+            <ul>
+                <li>Use the <strong>web interface</strong> to upload your file.</li>
+                <li>The app <strong>automatically converts CSV to JSON</strong> for Graph API and <strong>activates pre-assigned tokens</strong>.</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>C. Assigning Tokens</h3>
+    <ol>
+        <li><strong>Search for users</strong>:
+            <ul>
+                <li>Use the <strong>web UI</strong> to find and assign tokens to users.</li>
+            </ul>
+        </li>
+        <li><strong>Bulk assignment</strong>:
+            <ul>
+                <li>Assign multiple tokens at once using the CSV pre-assignment feature.</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>D. Activating Tokens</h3>
+    <ol>
+        <li><strong>Automatic activation</strong>:
+            <ul>
+                <li>When tokens are pre-assigned in the CSV, the app <strong>automatically activates them</strong> by calculating the OTP code and sending it to Graph API.</li>
+            </ul>
+        </li>
+        <li><strong>User self-service</strong>:
+            <ul>
+                <li>Users activate tokens via the <strong>web form</strong> or their <strong>Security Info page</strong>.</li>
+            </ul>
+        </li>
+        <li><strong>Auto-generation</strong>:
+            <ul>
+                <li>The app can <strong>auto-generate TOTP codes</strong> from the secret key for activation.</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>E. Managing Tokens</h3>
+    <ul>
+        <li><strong>Unassign/Delete</strong>: Remove tokens from users or delete them permanently.</li>
+        <li><strong>Logs</strong>: View detailed logs for all operations.</li>
+    </ul>
+
+    <h2>7. Advantages of TOTP Token Inventory</h2>
+    <ul>
+        <li><strong>Automatic Token Activation</strong>:
+            <ul>
+                <li>When uploading a CSV with pre-assigned tokens, the app <strong>automatically activates them</strong> by calculating the OTP code and sending it to Graph API.</li>
+                <li>Supports both <strong>SHA-1 and SHA-256</strong> tokens.</li>
+                <li>Eliminates the need for <strong>separate bulk activation tools</strong>.</li>
+            </ul>
+        </li>
+        <li><strong>User-Friendly & Accessible</strong>:
+            <ul>
+                <li><strong>No scripting</strong>: Admins and users interact via a <strong>web UI</strong>, reducing errors and training needs.</li>
+                <li><strong>Self-service</strong>: Users activate tokens <strong>without admin intervention</strong>.</li>
+            </ul>
+        </li>
+        <li><strong>Bulk Operations & Automation</strong>:
+            <ul>
+                <li><strong>CSV/JSON import</strong>: Upload and assign <strong>hundreds of tokens at once</strong>.</li>
+                <li><strong>Auto-conversion</strong>: CSV files are <strong>automatically converted to JSON</strong> for Graph API.</li>
+            </ul>
+        </li>
+        <li><strong>Advanced Features</strong>:
+            <ul>
+                <li><strong>SHA-256 support</strong>: Handles both <strong>SHA-1 and SHA-256</strong> tokens.</li>
+                <li><strong>Time drift adjustment</strong>: Automatically adjusts for token time drift.</li>
+                <li><strong>Detailed logging</strong>: Tracks every action for <strong>compliance and troubleshooting</strong>.</li>
+            </ul>
+        </li>
+        <li><strong>Open-Source & Flexible</strong>:
+            <ul>
+                <li><strong>Free to use and modify</strong>: Customize the app to fit your workflows.</li>
+                <li><strong>Bundled app</strong>: Run on <strong>Windows without a server</strong> using PHPDesktop.</li>
+            </ul>
+        </li>
+        <li><strong>Role-Based Access</strong>:
+            <ul>
+                <li>Uses <strong>least-privilege roles</strong> (e.g., Authentication Policy Administrator).</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h2>8. Best Practices</h2>
+    <ul>
+        <li><strong>Backup credentials</strong>: Store your <strong>Client Secret</strong> securely.</li>
+        <li><strong>Test with a small batch</strong>: Validate the workflow before bulk importing.</li>
+        <li><strong>Monitor logs</strong>: Use logs to audit operations and troubleshoot issues.</li>
+        <li><strong>Keep permissions updated</strong>: Ensure Graph API permissions are current.</li>
+    </ul>
+
+    <h2>9. Conclusion</h2>
+    <p>The <strong>TOTP Token Inventory</strong> app is the <strong>only solution</strong> that offers <strong>automatic token activation</strong> during CSV import, making it the <strong>most efficient way</strong> to deploy and manage <strong>Token2 Classic OATH tokens</strong> in Microsoft Entra ID. With its <strong>user-friendly interface</strong>, <strong>bulk operations</strong>, and <strong>self-service activation</strong>, it provides a <strong>complete, scalable, and auditable</strong> solution for organizations of all sizes.</p>
+    <p>Say goodbye to manual activation processes—<strong>TOTP Token Inventory automates everything</strong>.</p>
+
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="#" class="btn">Download TOTP Token Inventory</a>
+        <a href="#" class="btn">View on GitHub</a>
+    </div>
+
+ 
+</body>
+</html>
