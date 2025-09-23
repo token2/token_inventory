@@ -4,7 +4,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 // Define whether running in local/PHP-Desktop environment
-define('LOCAL_APP', 1); // Set to 1 for PHP-Desktop, 0 for web server
+define('LOCAL_APP', 0); // Set to 1 for PHP-Desktop, 0 for web server
 
 // Handle logout
 if (isset($_GET['logout'])) {
