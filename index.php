@@ -4,7 +4,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 // Define whether running in local/PHP-Desktop environment
-define('LOCAL_APP', 0); // Set to 1 for PHP-Desktop, 0 for web server
+define('LOCAL_APP', 1); // Set to 1 for PHP-Desktop, 0 for web server
 
 // Handle logout
 if (isset($_GET['logout'])) {
@@ -138,7 +138,7 @@ echo '<!DOCTYPE html>
         </div>
     </div>
 </div><div style="position: fixed; bottom: 10px; right: 10px; font-size: 14px; color: #555;">
-  &copy; Token2
+  &copy; Token2 | <a target=_blank href=https://www.token2.swiss/site/page/totp-token-inventory-automate-token2-classic-oath-token-activation-in-microsoft-entra-id>🛈 About this tool</a>
 </div>
 </body>
 </html>';
@@ -382,7 +382,7 @@ curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
             $assignUrl = "https://graph.microsoft.com/beta/users/$upn/authentication/hardwareOathMethods";
             $assignData = ["device" => ["id" => $tokenId]];
 
-            $assignCh = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
+            $assignCh = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($assignCh, CURLOPT_SSL_VERIFYPEER, false); curl_setopt($assignCh, CURLOPT_SSL_VERIFYHOST, false); }
             curl_setopt($assignCh, CURLOPT_URL, $assignUrl);
             curl_setopt($assignCh, CURLOPT_POST, true);
             curl_setopt($assignCh, CURLOPT_POSTFIELDS, json_encode($assignData));
@@ -402,7 +402,7 @@ curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
                 $activateUrl = "https://graph.microsoft.com/beta/users/$upn/authentication/hardwareOathMethods/$tokenId/activate";
                 $activateData = ["verificationCode" => generateTOTPCode($secretKey)]; //  
 
-                $activateCh = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
+                $activateCh = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($activateCh, CURLOPT_SSL_VERIFYPEER, false); curl_setopt($activateCh, CURLOPT_SSL_VERIFYHOST, false); }
                 curl_setopt($activateCh, CURLOPT_URL, $activateUrl);
                 curl_setopt($activateCh, CURLOPT_POST, true);
                 curl_setopt($activateCh, CURLOPT_POSTFIELDS, json_encode($activateData));
@@ -1382,7 +1382,9 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
             </tbody>
         </table>
     </div><div style="position: fixed; bottom: 10px; right: 10px; font-size: 14px; color: #555;">
-  &copy; Token2
+   &copy; Token2 | <a target=_blank href=https://www.token2.swiss/site/page/totp-token-inventory-automate-token2-classic-oath-token-activation-in-microsoft-entra-id>🛈 About this tool</a>
+   
+   
 </div>
 
     <!-- Loading Spinner -->
