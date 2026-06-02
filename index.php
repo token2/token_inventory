@@ -21,14 +21,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'update_settings_form') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tenantId = trim($_POST['tenantId']);
         $clientId = trim($_POST['clientId']);
-        $clientSecret = trim($_POST['clientSecret']);
         
         // Save tenant ID and client ID in cookies (30 days)
         setcookie('tenantId', $tenantId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
         setcookie('clientId', $clientId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
         
-        // Keep only client secret in session
-        $_SESSION['clientSecret'] = $clientSecret;
+        // Store credentials in session (never in cookies)
+        saveAuthFromPost($_POST);
         $_SESSION['showLogs'] = isset($_POST['showLogs']) ? true : false;
         
         // Redirect back to main page with success message
@@ -43,14 +42,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'update_settings') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tenantId = trim($_POST['tenantId']);
         $clientId = trim($_POST['clientId']);
-        $clientSecret = trim($_POST['clientSecret']);
         
         // Save tenant ID and client ID in cookies (30 days)
         setcookie('tenantId', $tenantId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
         setcookie('clientId', $clientId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
         
-        // Keep only client secret in session
-        $_SESSION['clientSecret'] = $clientSecret;
+        // Store credentials in session (never in cookies)
+        saveAuthFromPost($_POST);
         $_SESSION['showLogs'] = isset($_POST['showLogs']) ? true : false;
         
         echo json_encode(['success' => true, 'message' => 'Settings updated successfully']);
@@ -65,18 +63,17 @@ $savedTenantId = $_COOKIE['tenantId'] ?? '';
 $savedClientId = $_COOKIE['clientId'] ?? '';
 
 // Ask for Microsoft credentials if not stored
-if (empty($savedTenantId) || empty($savedClientId) || !isset($_SESSION['clientSecret'])) {
+if (empty($savedTenantId) || empty($savedClientId) || !authConfigured()) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tenantId'])) {
         $tenantId = trim($_POST['tenantId']);
         $clientId = trim($_POST['clientId']);
-        $clientSecret = trim($_POST['clientSecret']);
         
         // Save tenant ID and client ID in cookies (30 days)
         setcookie('tenantId', $tenantId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
         setcookie('clientId', $clientId, time() + (30 * 24 * 60 * 60), '/', '', true, true);
         
-        // Keep only client secret in session
-        $_SESSION['clientSecret'] = $clientSecret;
+        // Store credentials in session (never in cookies)
+        saveAuthFromPost($_POST);
         $_SESSION['showLogs'] = isset($_POST['showLogs']) ? true : false;
         
         header('Location: ' . $_SERVER['PHP_SELF']);
@@ -106,8 +103,31 @@ echo '<!DOCTYPE html>
                     <input type="text" name="clientId" class="form-control" value="' . htmlspecialchars($savedClientId) . '" required>
                 </div>
                 <div class="form-group mb-3">
-                    <label>Client Secret:</label>
-                    <input type="password" name="clientSecret" class="form-control" required>
+                    <label>Authentication method:</label>
+                    <select name="authMethod" id="authMethod" class="form-control" onchange="toggleAuthFields()">
+                        <option value="secret" selected>Client Secret</option>
+                        <option value="certificate">Certificate</option>
+                    </select>
+                </div>
+                <div id="secretFields">
+                    <div class="form-group mb-3">
+                        <label>Client Secret:</label>
+                        <input type="password" name="clientSecret" class="form-control">
+                    </div>
+                </div>
+                <div id="certFields" style="display:none;">
+                    <div class="form-group mb-3">
+                        <label>Private key file path (PEM):</label>
+                        <input type="text" name="privateKeyPath" class="form-control" placeholder="C:\\path\\to\\private_key.pem">
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Private key passphrase (optional):</label>
+                        <input type="password" name="privateKeyPassphrase" class="form-control">
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Certificate thumbprint (hex, from Entra ID):</label>
+                        <input type="text" name="certThumbprint" class="form-control" placeholder="e.g. A1B2C3...">
+                    </div>
                 </div>
                 <div class="form-group mb-3">
                     <div class="form-check">
@@ -119,6 +139,14 @@ echo '<!DOCTYPE html>
                 </div>
                 <button type="submit" class="btn btn-primary mt-2">Save & Continue</button>
             </form>
+            <script>
+            function toggleAuthFields() {
+                var m = document.getElementById("authMethod").value;
+                document.getElementById("secretFields").style.display = (m === "secret") ? "block" : "none";
+                document.getElementById("certFields").style.display = (m === "certificate") ? "block" : "none";
+            }
+            toggleAuthFields();
+            </script>
         </div>
 
         <!-- README Tabs column -->
@@ -156,11 +184,125 @@ $tenantId = $_COOKIE['tenantId'] ?? '';
 $clientId = $_COOKIE['clientId'] ?? '';
 $clientSecret = $_SESSION['clientSecret'] ?? '';
 
-// Get Access Token
+/**
+ * Persist auth settings from a POST array into the session.
+ * Secret OR certificate config is kept server-side only (never in cookies).
+ */
+function saveAuthFromPost($post)
+{
+    $method = ($post['authMethod'] ?? 'secret') === 'certificate' ? 'certificate' : 'secret';
+    $_SESSION['authMethod'] = $method;
+
+    if ($method === 'certificate') {
+        $_SESSION['clientSecret'] = '';
+        $_SESSION['privateKeyPath'] = trim($post['privateKeyPath'] ?? '');
+        $_SESSION['certThumbprint'] = trim($post['certThumbprint'] ?? '');
+        // Only overwrite the passphrase if a new one was supplied
+        if (isset($post['privateKeyPassphrase']) && $post['privateKeyPassphrase'] !== '') {
+            $_SESSION['privateKeyPassphrase'] = $post['privateKeyPassphrase'];
+        }
+    } else {
+        // Only overwrite the secret if a new one was supplied (lets users
+        // save settings without re-typing it every time)
+        if (isset($post['clientSecret']) && trim($post['clientSecret']) !== '') {
+            $_SESSION['clientSecret'] = trim($post['clientSecret']);
+        }
+        $_SESSION['privateKeyPath'] = '';
+        $_SESSION['certThumbprint'] = '';
+        $_SESSION['privateKeyPassphrase'] = '';
+    }
+}
+
+/**
+ * True when enough credentials are stored for the selected auth method.
+ */
+function authConfigured()
+{
+    $method = $_SESSION['authMethod'] ?? 'secret';
+    if ($method === 'certificate') {
+        return !empty($_SESSION['privateKeyPath']) && !empty($_SESSION['certThumbprint']);
+    }
+    return !empty($_SESSION['clientSecret']);
+}
+
+/**
+ * Build a signed JWT client assertion (RS256) for certificate-based auth.
+ * Uses only the built-in openssl extension - no Composer dependencies.
+ */
+function buildClientAssertion($tenantId, $clientId)
+{
+    $path = $_SESSION['privateKeyPath'] ?? '';
+    $thumbprintHex = str_replace([':', ' '], '', $_SESSION['certThumbprint'] ?? '');
+    $passphrase = $_SESSION['privateKeyPassphrase'] ?? null;
+
+    if (empty($path) || !is_readable($path)) {
+        throw new Exception("Private key file not found or not readable: $path");
+    }
+    if (empty($thumbprintHex)) {
+        throw new Exception("Certificate thumbprint is required for certificate auth.");
+    }
+
+    $keyContents = file_get_contents($path);
+    $keyResource = openssl_pkey_get_private($keyContents, $passphrase);
+    if ($keyResource === false) {
+        throw new Exception("Could not load private key (wrong file or passphrase).");
+    }
+
+    $b64url = function ($data) {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+    };
+
+    // x5t header = base64url( raw bytes of SHA-1 thumbprint )
+    $x5t = $b64url(hex2bin($thumbprintHex));
+
+    $now = time();
+    $header = ['alg' => 'RS256', 'typ' => 'JWT', 'x5t' => $x5t];
+    $payload = [
+        'aud' => "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token",
+        'iss' => $clientId,
+        'sub' => $clientId,
+        'jti' => bin2hex(random_bytes(16)),
+        'nbf' => $now,
+        'exp' => $now + 600,
+        'iat' => $now,
+    ];
+
+    $signingInput = $b64url(json_encode($header)) . '.' . $b64url(json_encode($payload));
+
+    $signature = '';
+    if (!openssl_sign($signingInput, $signature, $keyResource, OPENSSL_ALGO_SHA256)) {
+        throw new Exception("Failed to sign client assertion with the private key.");
+    }
+
+    return $signingInput . '.' . $b64url($signature);
+}
+
+// Get Access Token (supports client secret OR certificate auth).
+// Reads the chosen method and credentials from the session, so existing
+// call sites passing ($tenantId, $clientId, $clientSecret) keep working.
 function getAccessToken($tenantId, $clientId, $clientSecret)
 {
     $url = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token";
-    $data = ['grant_type' => 'client_credentials', 'client_id' => $clientId, 'client_secret' => $clientSecret, 'scope' => 'https://graph.microsoft.com/.default'];
+    $method = $_SESSION['authMethod'] ?? 'secret';
+
+    if ($method === 'certificate') {
+        $assertion = buildClientAssertion($tenantId, $clientId);
+        $data = [
+            'grant_type'            => 'client_credentials',
+            'client_id'             => $clientId,
+            'scope'                 => 'https://graph.microsoft.com/.default',
+            'client_assertion_type' => 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+            'client_assertion'      => $assertion,
+        ];
+    } else {
+        $data = [
+            'grant_type'    => 'client_credentials',
+            'client_id'     => $clientId,
+            'client_secret' => $clientSecret,
+            'scope'         => 'https://graph.microsoft.com/.default',
+        ];
+    }
+
     $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -1117,9 +1259,41 @@ try {
                                 <input type="text" name="clientId" class="form-control" value="<?= htmlspecialchars($clientId) ?>" required>
                             </div>
                             <div class="form-group">
-                                <label>Client Secret:</label>
-                                <input type="password" name="clientSecret" class="form-control" value="<?= htmlspecialchars($clientSecret) ?>" required>
+                                <label>Authentication method:</label>
+                                <select name="authMethod" id="authMethodSettings" class="form-control" onchange="toggleAuthFieldsSettings()">
+                                    <option value="secret" <?= (($_SESSION['authMethod'] ?? 'secret') !== 'certificate') ? 'selected' : '' ?>>Client Secret</option>
+                                    <option value="certificate" <?= (($_SESSION['authMethod'] ?? 'secret') === 'certificate') ? 'selected' : '' ?>>Certificate</option>
+                                </select>
                             </div>
+                            <div id="secretFieldsSettings">
+                                <div class="form-group">
+                                    <label>Client Secret:</label>
+                                    <input type="password" name="clientSecret" class="form-control" value="<?= htmlspecialchars($clientSecret) ?>">
+                                    <small class="form-text text-muted">Leave blank to keep the existing secret.</small>
+                                </div>
+                            </div>
+                            <div id="certFieldsSettings">
+                                <div class="form-group">
+                                    <label>Private key file path (PEM):</label>
+                                    <input type="text" name="privateKeyPath" class="form-control" value="<?= htmlspecialchars($_SESSION['privateKeyPath'] ?? '') ?>" placeholder="C:\path\to\private_key.pem">
+                                </div>
+                                <div class="form-group">
+                                    <label>Private key passphrase (optional):</label>
+                                    <input type="password" name="privateKeyPassphrase" class="form-control" placeholder="Leave blank to keep existing">
+                                </div>
+                                <div class="form-group">
+                                    <label>Certificate thumbprint (hex, from Entra ID):</label>
+                                    <input type="text" name="certThumbprint" class="form-control" value="<?= htmlspecialchars($_SESSION['certThumbprint'] ?? '') ?>">
+                                </div>
+                            </div>
+                            <script>
+                            function toggleAuthFieldsSettings() {
+                                var m = document.getElementById("authMethodSettings").value;
+                                document.getElementById("secretFieldsSettings").style.display = (m === "secret") ? "block" : "none";
+                                document.getElementById("certFieldsSettings").style.display = (m === "certificate") ? "block" : "none";
+                            }
+                            toggleAuthFieldsSettings();
+                            </script>
                             <hr>
                             <div class="form-group">
                                 <div class="form-check">
