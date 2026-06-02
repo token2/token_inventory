@@ -54,7 +54,10 @@ The **TOTP Token Inventory** app is a **powerful, open-source PHP tool** designe
 - **Server**: Works on **any server with PHP 7.4+** (Linux/Windows).
 - **Bundled App**: Also available as a **PHPDesktop-based Windows app** (no server required).
 - **Microsoft Entra ID**:
-  - **Tenant ID**, **Client ID**, and **Client Secret** (from an App Registration with **Graph API permissions**).
+  - **Tenant ID**, **Client ID**, and **either a Client Secret or a Certificate** (from an App Registration with **Graph API permissions**).
+  - **Authentication method**: The app supports **two ways** to authenticate the App Registration:
+    - **Client Secret** – the original, simplest method.
+    - **Certificate** – a **certificate-based credential** (signed JWT client assertion). More secure, as no shared secret is stored, and recommended for production. See **Section 6.F**.
   - **Required permissions**:
     - `Policy.ReadWrite.AuthenticationMethod`
     - `UserAuthenticationMethod.ReadWrite.All`
@@ -81,7 +84,8 @@ The **TOTP Token Inventory** app is a **powerful, open-source PHP tool** designe
 1. **Download and install**:
    - Deploy on a **PHP server** or use the **bundled Windows app**.
 2. **Enter credentials**:
-   - Provide your **Tenant ID**, **Client ID**, and **Client Secret**.
+   - Provide your **Tenant ID** and **Client ID**.
+   - Choose an **Authentication method**: **Client Secret** or **Certificate** (see **Section 6.F** to set up a certificate).
 3. **Verify permissions**:
    - Ensure the app has the required **Graph API permissions** and admin consent.
 
@@ -109,8 +113,58 @@ The **TOTP Token Inventory** app is a **powerful, open-source PHP tool** designe
 
 ---
 
+### **F. Certificate-Based Authentication (Optional)**
+Instead of a **Client Secret**, you can authenticate the App Registration using a **certificate**. The app builds a **signed JWT client assertion** and sends it to Entra ID — no shared secret is stored on disk.
+
+**What you need:**
+- A **public certificate** (`.cer`) uploaded to your App Registration.
+- The matching **private key in PEM format** (`-----BEGIN PRIVATE KEY-----`), readable by the PHP process.
+- The certificate **thumbprint** (hex), shown by Entra ID after upload.
+
+**1. Generate a certificate (Windows, PowerShell):**
+
+Use the bundled helper script `Generate-Token2Cert.ps1` (PowerShell 7+) or `Generate-Token2Cert-51.ps1` (Windows PowerShell 5.1, uses OpenSSL):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Generate-Token2Cert.ps1
+```
+
+This produces:
+- `token2_public.cer` – the **public certificate** to upload to Entra ID.
+- `private_key.pem` – the **private key** for the app.
+- A printed **thumbprint** to paste into the app.
+
+> **Note:** If a **SafeNet / Thales token dialog** appears, it means a hardware-token provider is being used. The scripts force the **Microsoft software provider** (`-Provider "Microsoft Enhanced RSA and AES Cryptographic Provider"`) to avoid this. Hardware-token-stored keys cannot be exported to PEM and are not supported by this app.
+
+Alternatively, generate everything in one step with **OpenSSL**:
+
+```powershell
+openssl req -x509 -newkey rsa:2048 -keyout private_key.pem -out token2_public.cer -days 730 -nodes -subj "/CN=Token2 Inventory App"
+openssl x509 -in token2_public.cer -noout -fingerprint -sha1
+```
+
+**2. Upload the public certificate to Entra ID:**
+- Go to **Azure Portal → App registrations → your app → Certificates & secrets → Certificates → Upload certificate**.
+- Upload `token2_public.cer`.
+- Entra ID displays the **thumbprint** — confirm it matches the one printed by the script.
+
+**3. Configure the app:**
+- On the credentials screen (or **Settings**), set **Authentication method** to **Certificate**.
+- **Private key file path**: full path to `private_key.pem` (e.g. `C:\token2\private_key.pem`).
+- **Private key passphrase**: only if you created an **encrypted** PEM; otherwise leave blank.
+- **Certificate thumbprint**: paste the hex thumbprint.
+
+**4. Security notes:**
+- Treat `private_key.pem` like a password — anyone with it can authenticate as your app.
+- Store the key **outside the web root** when running on a web server.
+- A **self-signed certificate is sufficient**, because Entra ID trusts it by explicit upload (not by a CA chain).
+- Set a reminder before the certificate **expiry date** — token requests fail once it expires.
+
+---
+
 ## **7. Best Practices**
-- **Backup credentials**: Store your **Client Secret** securely.
+- **Backup credentials**: Store your **Client Secret** or **private key (PEM)** securely.
+- **Prefer certificates in production**: Certificate-based auth avoids storing a shared secret and is generally more secure than a Client Secret.
 - **Test with a small batch**: Validate the workflow before bulk importing.
 - **Monitor logs**: Use logs to audit operations and troubleshoot issues.
 - **Keep permissions updated**: Ensure Graph API permissions are current.
