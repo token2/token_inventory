@@ -6,6 +6,22 @@ ini_set('display_errors', 1);
 // Define whether running in local/PHP-Desktop environment
 define('LOCAL_APP', 1); // Set to 1 for PHP-Desktop, 0 for web server
 
+// Server-side debug logging. When enabled, diagnostic messages are appended
+// to the file below instead of being sent to stderr/error_log: on some
+// SAPIs (notably IIS FastCGI with fastcgi.logging=1) any stderr output
+// fails the request with HTTP 500 and leaks the message into the response.
+// The default location is the system temp directory so the log never lands
+// inside the web root or the git repository.
+define('DEBUG_LOG', 0); // Set to 1 to enable diagnostic logging
+define('DEBUG_LOG_FILE', sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'token2_debug.log');
+
+function debugLog($message)
+{
+    if (DEBUG_LOG) {
+        @file_put_contents(DEBUG_LOG_FILE, '[' . date('Y-m-d H:i:s') . '] ' . $message . PHP_EOL, FILE_APPEND | LOCK_EX);
+    }
+}
+
 // Handle logout
 if (isset($_GET['logout'])) {
     session_destroy();
@@ -322,7 +338,7 @@ curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
         $errorDescription = $resp['error_description'] ?? 'Unknown authentication error';
         
         // Log the specific error for debugging
-        error_log("Authentication failed: HTTP $httpCode - Error: $error - Description: $errorDescription");
+        debugLog("Authentication failed: HTTP $httpCode - Error: $error - Description: $errorDescription");
         
         // Check for common credential errors
         if (strpos($errorDescription, 'AADSTS70002') !== false || strpos($errorDescription, 'invalid_client') !== false) {
@@ -601,12 +617,10 @@ function getUsers($accessToken, $query = '') {
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $accessToken", "Content-Type: application/json"]);
     
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_VERBOSE, true);
-    
+
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlError = curl_error($ch);
-    $curlInfo = curl_getinfo($ch);
     curl_close($ch);
     
     $debugInfo['http_code'] = $httpCode;
@@ -615,11 +629,11 @@ function getUsers($accessToken, $query = '') {
     $debugInfo['response_preview'] = substr($response, 0, 200);
     
     // Log debug info
-    error_log("getUsers Debug: " . json_encode($debugInfo));
-    
+    debugLog("getUsers Debug: " . json_encode($debugInfo));
+
     // Check for curl errors
     if ($response === false) {
-        error_log("CURL Error in getUsers: " . $curlError);
+        debugLog("CURL Error in getUsers: " . $curlError);
         return [
             'debug' => $debugInfo, 
             'error' => 'CURL Error: ' . $curlError,
@@ -629,7 +643,7 @@ function getUsers($accessToken, $query = '') {
     
     // Check for HTTP errors
     if ($httpCode !== 200) {
-        error_log("HTTP Error in getUsers: HTTP $httpCode - Response: " . $response);
+        debugLog("HTTP Error in getUsers: HTTP $httpCode - Response: " . $response);
         
         // Parse response for permission errors
         $resp = json_decode($response, true);
@@ -661,7 +675,7 @@ function getUsers($accessToken, $query = '') {
     
     // Check for JSON decode errors
     if (json_last_error() !== JSON_ERROR_NONE) {
-        error_log("JSON Decode Error in getUsers: " . json_last_error_msg());
+        debugLog("JSON Decode Error in getUsers: " . json_last_error_msg());
         return [
             'debug' => $debugInfo, 
             'error' => 'JSON Error: ' . json_last_error_msg(),
@@ -869,7 +883,7 @@ function generateTOTPCode($base32Secret, $timeInterval = 30) {
         return str_pad($code, 6, '0', STR_PAD_LEFT);
         
     } catch (Exception $e) {
-        error_log("TOTP generation error: " . $e->getMessage());
+        debugLog("TOTP generation error: " . $e->getMessage());
         return false;
     }
 }
