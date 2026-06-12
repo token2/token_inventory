@@ -6,6 +6,15 @@ ini_set('display_errors', 1);
 // Define whether running in local/PHP-Desktop environment
 define('LOCAL_APP', 1); // Set to 1 for PHP-Desktop, 0 for web server
 
+
+// HTTP proxy support (rarely needed). Uncomment the two lines #14 and #15 below and set
+// your proxy host:port to route all Microsoft Graph traffic through a proxy.
+// For an authenticated proxy use: http://user:password@host:port
+
+// putenv('http_proxy=http://10.0.0.1:8080');
+// putenv('https_proxy=http://10.0.0.1:8080');
+
+
 // Server-side debug logging. When enabled, diagnostic messages are appended
 // to the file below instead of being sent to stderr/error_log: on some
 // SAPIs (notably IIS FastCGI with fastcgi.logging=1) any stderr output
