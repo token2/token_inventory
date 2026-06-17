@@ -7,12 +7,21 @@ ini_set('display_errors', 1);
 define('LOCAL_APP', 1); // Set to 1 for PHP-Desktop, 0 for web server
 
 
-// HTTP proxy support (rarely needed). Uncomment the two lines #14 and #15 below and set
-// your proxy host:port to route all Microsoft Graph traffic through a proxy.
-// For an authenticated proxy use: http://user:password@host:port
+// HTTP proxy support (leave $proxy empty if not needed).
+// For an authenticated proxy set $proxy_userpwd to "username:password".
+$proxy         = '';  // e.g. 'http://proxy.company.com:8080'
+$proxy_userpwd = '';  // e.g. 'username:password'
 
-// putenv('http_proxy=http://10.0.0.1:8080');
-// putenv('https_proxy=http://10.0.0.1:8080');
+function applyProxySettings($ch) {
+    global $proxy, $proxy_userpwd;
+    if (!empty($proxy)) {
+        curl_setopt($ch, CURLOPT_PROXY, $proxy);
+        curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
+        if (!empty($proxy_userpwd)) {
+            curl_setopt($ch, CURLOPT_PROXYUSERPWD, $proxy_userpwd);
+        }
+    }
+}
 
 
 // Server-side debug logging. When enabled, diagnostic messages are appended
@@ -330,6 +339,7 @@ function getAccessToken($tenantId, $clientId, $clientSecret)
 
     $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
+    applyProxySettings($ch);
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
@@ -373,6 +383,7 @@ function fetchTokens($accessToken, $nextLink = '')
     }
     $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
+    applyProxySettings($ch);
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $accessToken", "Content-Type: application/json"]);
@@ -428,6 +439,7 @@ function importTokens($accessToken, $data)
     $url = "https://graph.microsoft.com/beta/directory/authenticationMethodDevices/hardwareOathDevices";
     $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
+    applyProxySettings($ch);
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PATCH");
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
@@ -536,6 +548,7 @@ function importCSVTokens($accessToken, $csvData, $importMode = 'import_assign_ac
         $url = "https://graph.microsoft.com/beta/directory/authenticationMethodDevices/hardwareOathDevices";
         $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
+        applyProxySettings($ch);
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($tokenData));
@@ -562,6 +575,7 @@ curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
             $assignData = ["device" => ["id" => $tokenId]];
 
             $assignCh = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($assignCh, CURLOPT_SSL_VERIFYPEER, false); curl_setopt($assignCh, CURLOPT_SSL_VERIFYHOST, false); }
+            applyProxySettings($assignCh);
             curl_setopt($assignCh, CURLOPT_URL, $assignUrl);
             curl_setopt($assignCh, CURLOPT_POST, true);
             curl_setopt($assignCh, CURLOPT_POSTFIELDS, json_encode($assignData));
@@ -582,6 +596,7 @@ curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
                 $activateData = ["verificationCode" => generateTOTPCode($secretKey)]; //  
 
                 $activateCh = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($activateCh, CURLOPT_SSL_VERIFYPEER, false); curl_setopt($activateCh, CURLOPT_SSL_VERIFYHOST, false); }
+                applyProxySettings($activateCh);
                 curl_setopt($activateCh, CURLOPT_URL, $activateUrl);
                 curl_setopt($activateCh, CURLOPT_POST, true);
                 curl_setopt($activateCh, CURLOPT_POSTFIELDS, json_encode($activateData));
@@ -621,6 +636,7 @@ function getUsers($accessToken, $query = '') {
     $debugInfo['url'] = $url;
     
     $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); } else { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true); }
+    applyProxySettings($ch);
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $accessToken", "Content-Type: application/json"]);
@@ -707,6 +723,7 @@ function assignToken($accessToken, $userId, $tokenId)
     $data = ["device" => ["id" => $tokenId]];
     $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
+    applyProxySettings($ch);
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
@@ -741,6 +758,7 @@ function activateToken($accessToken, $userId, $tokenId, $code)
     $data = ["verificationCode" => $code];
     $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
+    applyProxySettings($ch);
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
@@ -774,6 +792,7 @@ function unassignToken($accessToken, $userId, $tokenId)
     $url = "https://graph.microsoft.com/beta/users/$userId/authentication/hardwareOathMethods/$tokenId";
     $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
+    applyProxySettings($ch);
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $accessToken"]);
@@ -806,6 +825,7 @@ function deleteToken($accessToken, $tokenId)
     $url = "https://graph.microsoft.com/beta/directory/authenticationMethodDevices/hardwareOathDevices/$tokenId";
     $ch = curl_init(); if (LOCAL_APP  == 1 ) { curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); }
+    applyProxySettings($ch);
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer $accessToken"]);
