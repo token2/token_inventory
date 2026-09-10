@@ -1570,7 +1570,27 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
             </div>
         </div>
 		
-		
+		<?php
+    $totalTokens    = count($tokens);
+    $assignedTokens = 0;
+    foreach ($tokens as $t) {
+        if (isset($t['assignedTo']['id'])) {
+            $assignedTokens++;
+        }
+    }
+    $unassignedTokens = $totalTokens - $assignedTokens;
+?>
+<div class="text-right mb-2">
+    <span class="badge badge-pill badge-light border px-3 py-2" style="font-size:.8rem; font-weight:500;">
+        <i class="fas fa-key mr-1"></i><?= $totalTokens ?> total
+    </span>
+    <span class="badge badge-pill badge-success px-3 py-2" style="font-size:.8rem; font-weight:500;">
+        <i class="fas fa-user-check mr-1"></i><?= $assignedTokens ?> assigned
+    </span>
+    <span class="badge badge-pill badge-warning px-3 py-2" style="font-size:.8rem; font-weight:500;">
+        <i class="fas fa-inbox mr-1"></i><?= $unassignedTokens ?> unassigned
+    </span>
+</div>
         <!-- Tokens Table -->
         <table id="tokensTable" class="table table-striped">
             <thead>
