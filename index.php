@@ -1581,6 +1581,16 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
     $unassignedTokens = $totalTokens - $assignedTokens;
 ?>
 <div class="text-right mb-2">
+    <div class="btn-group mr-2" role="group" id="exportGroup" style="position:relative;">
+        <button type="button" class="btn btn-sm btn-outline-primary" id="exportToggle">
+            <i class="fas fa-file-export mr-1"></i>Export <i class="fas fa-caret-down ml-1"></i>
+        </button>
+        <div id="exportMenu" style="display:none; position:absolute; right:0; top:100%; z-index:1000; min-width:160px; background:#fff; border:1px solid rgba(0,0,0,.15); border-radius:.25rem; box-shadow:0 .5rem 1rem rgba(0,0,0,.175); text-align:left;">
+            <a class="dropdown-item py-1" href="#" onclick="exportTokens('all'); return false;">All tokens</a>
+            <a class="dropdown-item py-1" href="#" onclick="exportTokens('assigned'); return false;">Assigned only</a>
+            <a class="dropdown-item py-1" href="#" onclick="exportTokens('unassigned'); return false;">Unassigned only</a>
+        </div>
+    </div>
     <span class="badge badge-pill badge-light border px-3 py-2" style="font-size:.8rem; font-weight:500;">
         <i class="fas fa-key mr-1"></i><?= $totalTokens ?> total
     </span>
@@ -1607,7 +1617,10 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
             </thead>
             <tbody>
                 <?php foreach ($tokens as $t) : ?>
-                    <tr data-id="<?= htmlspecialchars($t['id']) ?>">
+                    <tr data-id="<?= htmlspecialchars($t['id']) ?>"
+                        data-assigned="<?= isset($t['assignedTo']['id']) ? '1' : '0' ?>"
+                        data-account="<?= htmlspecialchars($t['assignedTo']['displayName'] ?? '', ENT_QUOTES) ?>"
+                        data-created="<?= htmlspecialchars($t['createdDateTime'] ?? '', ENT_QUOTES) ?>">
                         <td><?= htmlspecialchars($t['serialNumber']) ?></td>
                         <td><?= htmlspecialchars($t['manufacturer'] . '/' . $t['model']) ?></td>
 						<td><?= htmlspecialchars($t['hashFunction']) ?></td>
@@ -1713,6 +1726,59 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
                     [4, 'desc']
                 ]
             });
+
+            // Export menu toggle (self-contained; does not rely on Bootstrap's
+            // dropdown JS, which needs Popper and isn't loaded on this page).
+            $('#exportToggle').on('click', function (e) {
+                e.stopPropagation();
+                $('#exportMenu').toggle();
+            });
+            $(document).on('click', function () { $('#exportMenu').hide(); });
+            $('#exportMenu').on('click', function (e) { e.stopPropagation(); });
+
+            // Export tokens (issue #21): all / assigned / unassigned.
+            // Pulls from the DataTables row set so ALL pages are included, not just
+            // the 25 rows visible on the current page.
+            window.exportTokens = function (filter) {
+                filter = filter || 'all';
+                $('#exportMenu').hide();
+                var dt = $('#tokensTable').DataTable();
+                var esc = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+                var lines = ['Serial number,Device,Hash,Interval (s),Account,Status,Date assigned,Last seen'];
+                var count = 0;
+
+                dt.rows().nodes().to$().each(function () {
+                    var tr = this;
+                    var isAssigned = tr.dataset.assigned === '1';
+                    if (filter === 'assigned' && !isAssigned) return;
+                    if (filter === 'unassigned' && isAssigned) return;
+
+                    var c = tr.children;
+                    var serial   = c[0].textContent.trim();
+                    var device   = c[1].textContent.trim();
+                    var hash     = c[2].textContent.trim();
+                    var interval = c[3].textContent.replace('s', '').trim();
+                    var account  = isAssigned ? (tr.dataset.account || '') : '';
+                    var status   = c[5].textContent.trim();
+                    var created  = (isAssigned && tr.dataset.created) ? tr.dataset.created.slice(0, 10) : '';
+                    var lastSeen = c[6].textContent.trim();
+
+                    lines.push([
+                        esc(serial), esc(device), esc(hash), esc(interval),
+                        esc(account), esc(status), esc(created), esc(lastSeen)
+                    ].join(','));
+                    count++;
+                });
+
+                if (count === 0) { alert('No ' + filter + ' tokens to export.'); return; }
+
+                var blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = filter + '_tokens_' + new Date().toISOString().slice(0, 10) + '.csv';
+                document.body.appendChild(a); a.click(); a.remove();
+                URL.revokeObjectURL(a.href);
+            };
             
             // Handle import mode changes
             document.querySelectorAll('input[name="import_mode"]').forEach(function(radio) {
