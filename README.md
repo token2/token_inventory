@@ -177,3 +177,4 @@ The **TOTP Token Inventory** app is the **only solution** that offers **automati
 **Say goodbye to manual activation processes—TOTP Token Inventory automates everything.**
 
  
+The Python ported version of the same tool is available here https://github.com/SylvainSorlin/token_inventory_python 
