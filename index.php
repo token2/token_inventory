@@ -6,6 +6,14 @@ session_start();
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 ini_set('display_errors', 1);
 
+// Application version, shown in the footer of every page. Update on each release.
+define('APP_VERSION', 'R5');
+
+function appVersionFooter() {
+    return '<footer class="text-center text-muted small mt-4 mb-3">TOTP Tokens Inventory '
+        . htmlspecialchars(APP_VERSION) . ' &middot; PHP ' . htmlspecialchars(PHP_VERSION) . '</footer>';
+}
+
 // Define whether running in local/PHP-Desktop environment
 define('LOCAL_APP', 1); // Set to 1 for PHP-Desktop, 0 for web server
 
@@ -228,6 +236,7 @@ echo '<!DOCTYPE html>
 </div><div style="position: fixed; bottom: 10px; right: 10px; font-size: 14px; color: #555;">
   &copy; Token2 | <a target=_blank href=https://www.token2.swiss/site/page/totp-token-inventory-automate-token2-classic-oath-token-activation-in-microsoft-entra-id>🛈 About this tool</a>
 </div>
+' . appVersionFooter() . '
 </body>
 </html>';
 exit;
@@ -2388,5 +2397,6 @@ user@token2.com,1100000000000,JBSWY3DPEHPK3PXP,30,Token2,miniOTP-1" required></t
                 });
         }
     </script>
+    <?php echo appVersionFooter(); ?>
 </body>
 </html>
